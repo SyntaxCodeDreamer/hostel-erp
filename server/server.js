@@ -97,7 +97,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/uploads', express.static(uploadsDir));
 
 // Serve Frontend Static Production Build
-const frontendDistPath = path.join(__dirname, '../frontend/dist');
+const frontendDistPath = path.join(__dirname, '../client/dist');
 if (fs.existsSync(frontendDistPath)) {
   app.use(express.static(frontendDistPath));
   app.get('*', (req, res, next) => {
