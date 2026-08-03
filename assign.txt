@@ -1,0 +1,7 @@
+web push notification implementation for getting the notification like app notification on there device.
+student Remove the result upload section instead of that past there drive link
+in student profile section add the custome section for student where student can add there overoll progress during the year with fields of title description remarks proof link other and then create button when student create then we show the card gird section in there profile and also update in admin student listing section like when the profile open by admin then admin can also see the overoll details of students including student added there custome details section, also in that custome section form also add the category like which category of details is that.
+when we send the login the mail password then password not directly show we show like the bank password like provide instruction in mail for password
+when student on leave then automatically status change in there profile on leave on admin side 
+when admin add the trust or leader then also send the login mail similar like the student but assign role trusty or leader 
+
