@@ -16,7 +16,7 @@ dist/
 build/
 
 # Uploaded media files
-server/uploads/
+backend/uploads/
 uploads/
 
 # Log files
