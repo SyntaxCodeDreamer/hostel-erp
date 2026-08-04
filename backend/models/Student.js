@@ -19,6 +19,7 @@ const studentSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  fullName: { type: String },
   village: { type: String, required: true },
   homeAddress: { type: String, required: true },
   course: { type: String, required: true },

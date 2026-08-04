@@ -48,13 +48,14 @@ const getStudents = async (req, res) => {
   try {
     let query = {};
     const userRole = (req.user.role || '').toLowerCase();
-    
+
     if (userRole === 'student') {
       // Students only see their own profile
       let student = await Student.findOne({ userId: req.user._id }).populate('userId', 'name email profileImage');
       if (!student) {
         student = new Student({
           userId: req.user._id,
+          fullName: req.user.name || 'Student Resident',
           village: 'N/A',
           homeAddress: 'N/A',
           course: 'N/A',
@@ -72,7 +73,7 @@ const getStudents = async (req, res) => {
       }
       return res.json([student]);
     }
-    
+
     const students = await Student.find(query).populate('userId', 'name email profileImage');
     for (const student of students) {
       await syncStudentLeaveStatus(student);
@@ -152,7 +153,8 @@ const createStudent = async (req, res) => {
     });
 
     const student = new Student({
-      userId: user._id, 
+      userId: user._id,
+      fullName: name,
       village, homeAddress, course, collegeName,
       otherCourseOrJob, joiningYear, joiningMonth,
       mobile, parentsMobile, drivingLicense, roomNumber
