@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import axios from 'axios';
+import apiClient from '../utils/apiClient';
 import { useNavigate, Link } from 'react-router-dom';
 import { ThemeContext } from '../context/ThemeContext';
 import { ArrowLeft, Save } from 'lucide-react';
@@ -33,17 +33,10 @@ const AddStudent = () => {
     e.preventDefault();
     setErrorMsg('');
     try {
-      const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-      const config = {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${userInfo.token}`
-        },
-      };
-      await axios.post('/api/students', formData, config);
+      await apiClient.post('/students', formData);
       navigate('/students');
     } catch (error) {
-      setErrorMsg(error.response?.data?.message || 'Error creating student');
+      setErrorMsg(error.message || 'Error creating student');
     }
   };
 

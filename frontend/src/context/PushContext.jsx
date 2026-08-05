@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import apiClient from '../utils/apiClient';
 import { AuthContext } from './AuthContext';
 import {
   registerServiceWorker,
@@ -83,18 +83,13 @@ export const PushProvider = ({ children }) => {
   const sendTestPush = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.post(
-        '/api/push/test',
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await apiClient.post('/push/test', {});
       setMessage({ type: 'success', text: res.data.message || 'Test notification sent!' });
     } catch (error) {
       console.error('Test push error:', error);
       setMessage({
         type: 'error',
-        text: error.response?.data?.message || 'Failed to send test push notification.'
+        text: error.message || 'Failed to send test push notification.'
       });
     } finally {
       setLoading(false);

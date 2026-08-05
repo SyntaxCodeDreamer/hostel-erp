@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import axios from 'axios';
+import apiClient from '../utils/apiClient';
 import { useNavigate } from 'react-router-dom';
 import { ThemeContext } from '../context/ThemeContext';
 
@@ -22,17 +22,10 @@ const LeaveRequestForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-      const config = {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${userInfo.token}`
-        },
-      };
-      await axios.post('/api/leaves', formData, config);
+      await apiClient.post('/leaves', formData);
       navigate('/leaves');
     } catch (error) {
-      alert(error.response?.data?.message || 'Error creating leave request. (Are you a student?)');
+      alert(error.message || 'Error creating leave request. (Are you a student?)');
     }
   };
 

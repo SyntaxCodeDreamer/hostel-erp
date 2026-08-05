@@ -5,7 +5,7 @@ import { ThemeContext } from '../context/ThemeContext';
 import { SocketContext } from '../context/SocketContext';
 import { usePush } from '../context/PushContext';
 import { Bell, Sun, Moon, Menu, BellRing, Smartphone, Send, Check, AlertCircle, RefreshCw } from 'lucide-react';
-import axios from 'axios';
+import apiClient from '../utils/apiClient';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const DashboardLayout = () => {
@@ -47,8 +47,7 @@ const DashboardLayout = () => {
 
   const fetchNotifications = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get('/api/notifications', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await apiClient.get('/notifications');
       setNotifications(res.data);
     } catch (error) {
       console.error('Error fetching notifications:', error);
@@ -57,8 +56,7 @@ const DashboardLayout = () => {
 
   const markAsRead = async (id) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.put(`/api/notifications/${id}/read`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      await apiClient.put(`/notifications/${id}/read`, {});
       fetchNotifications();
     } catch (error) {
       console.error('Error marking notification read:', error);
@@ -111,8 +109,7 @@ const DashboardLayout = () => {
   const handleChangePassword = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
-      await axios.put('/api/auth/change-password', passwordData, { headers: { Authorization: `Bearer ${token}` } });
+      await apiClient.put('/auth/change-password', passwordData);
       setPasswordMsg({ type: 'success', text: 'Password updated successfully!' });
       setTimeout(() => {
         setShowPasswordModal(false);
@@ -120,7 +117,7 @@ const DashboardLayout = () => {
         setPasswordData({ currentPassword: '', newPassword: '' });
       }, 2000);
     } catch (error) {
-      setPasswordMsg({ type: 'error', text: error.response?.data?.message || 'Failed to change password' });
+      setPasswordMsg({ type: 'error', text: error.message || 'Failed to change password' });
     }
   };
 

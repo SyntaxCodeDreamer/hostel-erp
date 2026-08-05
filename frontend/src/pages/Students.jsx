@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext } from 'react';
-import axios from 'axios';
+import apiClient from '../utils/apiClient';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { Eye, X, Phone, MapPin, GraduationCap, Edit3, Save, CheckCircle, ExternalLink, Link as LinkIcon, TrendingUp, Plus, Trash2, Award, FileText, Sparkles } from 'lucide-react';
@@ -46,19 +46,9 @@ const Students = () => {
 
     try {
       setProgressSaving(true);
-      const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-      const token = userInfo?.token || localStorage.getItem('token');
-      const config = {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-      };
-
-      const { data: updatedStudent } = await axios.post(
-        `/api/students/${targetId}/progress`,
-        progressData,
-        config
+      const { data: updatedStudent } = await apiClient.post(
+        `/students/${targetId}/progress`,
+        progressData
       );
 
       setSelectedStudent(updatedStudent);
@@ -74,7 +64,7 @@ const Students = () => {
       fetchStudents();
     } catch (err) {
       console.error('Error adding progress record:', err);
-      setProgressError(err.response?.data?.message || 'Error saving progress record');
+      setProgressError(err.message || 'Error saving progress record');
     } finally {
       setProgressSaving(false);
     }
@@ -86,14 +76,8 @@ const Students = () => {
     if (!targetId) return;
 
     try {
-      const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-      const token = userInfo?.token || localStorage.getItem('token');
-      const config = {
-        headers: { Authorization: `Bearer ${token}` },
-      };
-      const { data: updatedStudent } = await axios.delete(
-        `/api/students/${targetId}/progress/${itemId}`,
-        config
+      const { data: updatedStudent } = await apiClient.delete(
+        `/students/${targetId}/progress/${itemId}`
       );
       setSelectedStudent(updatedStudent);
       fetchStudents();
@@ -130,19 +114,14 @@ const Students = () => {
     if (!studentId) return;
     if (!window.confirm('Are you sure you want to permanently delete this student record and their login account?')) return;
     try {
-      const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-      const token = userInfo?.token || localStorage.getItem('token');
-      const config = {
-        headers: { Authorization: `Bearer ${token}` },
-      };
-      await axios.delete(`/api/students/${studentId}`, config);
+      await apiClient.delete(`/students/${studentId}`);
       setSaveSuccess('Student record deleted successfully');
       setSelectedStudent(null);
       fetchStudents();
       setTimeout(() => setSaveSuccess(''), 3000);
     } catch (err) {
       console.error('Error deleting student:', err);
-      alert(err.response?.data?.message || 'Failed to delete student');
+      alert(err.message || 'Failed to delete student');
     }
   };
 
@@ -169,16 +148,11 @@ const Students = () => {
 
   const fetchStudents = async () => {
     try {
-      const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-      const token = userInfo?.token || localStorage.getItem('token');
-      const config = {
-        headers: { Authorization: `Bearer ${token}` },
-      };
-      const { data } = await axios.get('/api/students', config);
+      const { data } = await apiClient.get('/students');
       const studentArr = Array.isArray(data) ? data : [];
       setStudents(studentArr);
 
-      const { data: leavesData } = await axios.get('/api/leaves', config).catch(() => ({ data: [] }));
+      const { data: leavesData } = await apiClient.get('/leaves').catch(() => ({ data: [] }));
       if (Array.isArray(leavesData)) {
         setLeavesList(leavesData);
       }
@@ -213,18 +187,12 @@ const Students = () => {
     });
 
     try {
-      const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-      const token = userInfo?.token || localStorage.getItem('token');
-      const config = {
-        headers: { Authorization: `Bearer ${token}` },
-      };
-
-      const { data: fullStudent } = await axios.get(`/api/students/${student._id}`, config).catch(() => ({ data: student }));
+      const { data: fullStudent } = await apiClient.get(`/students/${student._id}`).catch(() => ({ data: student }));
       if (fullStudent && fullStudent._id) {
         setSelectedStudent(fullStudent);
       }
 
-      const { data: leaves } = await axios.get('/api/leaves', config).catch(() => ({ data: [] }));
+      const { data: leaves } = await apiClient.get('/leaves').catch(() => ({ data: [] }));
       const leaveArr = Array.isArray(leaves) ? leaves : [];
       setLeavesList(leaveArr);
       const approvedCount = leaveArr.filter(
@@ -240,14 +208,8 @@ const Students = () => {
     e.preventDefault();
     setSaveSuccess('');
     try {
-      const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-      const token = userInfo?.token || localStorage.getItem('token');
-      const config = {
-        headers: { Authorization: `Bearer ${token}` },
-      };
-
-      const url = isStudent ? '/api/students/me' : `/api/students/${selectedStudent._id}`;
-      const { data: updated } = await axios.put(url, editForm, config);
+      const url = isStudent ? '/students/me' : `/students/${selectedStudent._id}`;
+      const { data: updated } = await apiClient.put(url, editForm);
 
       setSelectedStudent({ ...selectedStudent, ...updated });
       setIsEditing(false);
@@ -272,13 +234,9 @@ const Students = () => {
     setUploading(true);
 
     try {
-      const config = {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      };
-
-      const { data } = await axios.post('/api/upload', formData, config);
+      const { data } = await apiClient.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       setEditForm(prev => ({ 
         ...prev, 
         resultUrls: [...(prev.resultUrls || []), ...data] 
@@ -293,12 +251,7 @@ const Students = () => {
   const handleStatusChange = async (newStatus) => {
     if (!selectedStudent) return;
     try {
-      const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-      const token = userInfo?.token || localStorage.getItem('token');
-      const config = {
-        headers: { Authorization: `Bearer ${token}` },
-      };
-      await axios.put(`/api/students/${selectedStudent._id}`, { status: newStatus }, config);
+      await apiClient.put(`/students/${selectedStudent._id}`, { status: newStatus });
       setSelectedStudent({ ...selectedStudent, status: newStatus });
       fetchStudents();
     } catch (err) {

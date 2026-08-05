@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import axios from 'axios';
+import apiClient from '../utils/apiClient';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import {
@@ -45,13 +45,9 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-      const token = userInfo?.token || localStorage.getItem('token');
-      const config = { headers: { Authorization: `Bearer ${token}` } };
-      
       const [analyticsRes, annRes] = await Promise.all([
-        axios.get('/api/analytics', config).catch(() => ({ data: null })),
-        axios.get('/api/announcements', config).catch(() => ({ data: [] }))
+        apiClient.get('/analytics').catch(() => ({ data: null })),
+        apiClient.get('/announcements').catch(() => ({ data: [] }))
       ]);
 
       if (analyticsRes.data) {

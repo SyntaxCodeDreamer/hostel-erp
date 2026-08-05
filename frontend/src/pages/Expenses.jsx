@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import axios from 'axios';
+import apiClient from '../utils/apiClient';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { Wallet, Plus, Trash2 } from 'lucide-react';
@@ -16,11 +16,6 @@ const Expenses = () => {
 
   const isAdminOrLeader = user?.role === 'Admin' || user?.role === 'Leader' || user?.role === 'admin' || user?.role === 'leader';
 
-  const getAuthToken = () => {
-    const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-    return userInfo?.token || localStorage.getItem('token');
-  };
-
   useEffect(() => {
     fetchExpenses();
     fetchSummary();
@@ -28,8 +23,7 @@ const Expenses = () => {
 
   const fetchExpenses = async () => {
     try {
-      const token = getAuthToken();
-      const res = await axios.get('/api/expenses', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await apiClient.get('/expenses');
       setExpenses(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error('Error fetching expenses:', error);
@@ -38,8 +32,7 @@ const Expenses = () => {
 
   const fetchSummary = async () => {
     try {
-      const token = getAuthToken();
-      const res = await axios.get('/api/expenses/summary/monthly', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await apiClient.get('/expenses/summary/monthly');
       setSummary(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error('Error fetching summary:', error);
@@ -49,8 +42,7 @@ const Expenses = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const token = getAuthToken();
-      await axios.post('/api/expenses', formData, { headers: { Authorization: `Bearer ${token}` } });
+      await apiClient.post('/expenses', formData);
       setShowForm(false);
       setFormData({ date: '', category: 'Food', description: '', amount: '' });
       fetchExpenses();
@@ -62,8 +54,7 @@ const Expenses = () => {
 
   const handleDelete = async (id) => {
     try {
-      const token = getAuthToken();
-      await axios.delete(`/api/expenses/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      await apiClient.delete(`/expenses/${id}`);
       fetchExpenses();
       fetchSummary();
     } catch (error) {

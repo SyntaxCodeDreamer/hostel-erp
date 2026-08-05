@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { AuthContext } from './AuthContext';
+import { getSocketUrl } from '../utils/apiClient';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, X } from 'lucide-react';
 
@@ -29,7 +30,7 @@ export const SocketProvider = ({ children }) => {
   useEffect(() => {
     let newSocket;
     if (user) {
-      const socketUrl = window.location.origin;
+      const socketUrl = getSocketUrl();
       newSocket = io(socketUrl);
       
       newSocket.on('connect', () => {

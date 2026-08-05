@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import axios from 'axios';
+import apiClient from '../utils/apiClient';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { Pin, Plus, Trash2, Calendar, User as UserIcon } from 'lucide-react';
@@ -18,15 +18,9 @@ const Announcements = () => {
     fetchAnnouncements();
   }, []);
 
-  const getAuthToken = () => {
-    const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-    return userInfo?.token || localStorage.getItem('token');
-  };
-
   const fetchAnnouncements = async () => {
     try {
-      const token = getAuthToken();
-      const res = await axios.get('/api/announcements', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await apiClient.get('/announcements');
       setAnnouncements(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error('Error fetching announcements:', error);
@@ -36,8 +30,7 @@ const Announcements = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const token = getAuthToken();
-      await axios.post('/api/announcements', formData, { headers: { Authorization: `Bearer ${token}` } });
+      await apiClient.post('/announcements', formData);
       setShowForm(false);
       setFormData({ title: '', description: '', category: 'General', isPinned: false });
       fetchAnnouncements();
@@ -48,8 +41,7 @@ const Announcements = () => {
 
   const handleDelete = async (id) => {
     try {
-      const token = getAuthToken();
-      await axios.delete(`/api/announcements/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      await apiClient.delete(`/announcements/${id}`);
       fetchAnnouncements();
     } catch (error) {
       console.error('Error deleting announcement:', error);

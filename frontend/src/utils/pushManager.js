@@ -1,6 +1,4 @@
-import axios from 'axios';
-
-const API_BASE_URL = '/api';
+import apiClient from './apiClient';
 
 /**
  * Convert VAPID public key from URL-safe base64 to Uint8Array
@@ -53,10 +51,7 @@ export async function getServiceWorkerRegistration() {
  * Fetch VAPID public key from backend
  */
 export async function getVapidPublicKey() {
-  const token = localStorage.getItem('token');
-  const response = await axios.get(`${API_BASE_URL}/push/public-key`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {}
-  });
+  const response = await apiClient.get('/push/public-key');
   return response.data.publicKey;
 }
 
@@ -90,14 +85,7 @@ export async function subscribeUserToPush() {
   });
 
   // Send subscription to backend
-  const token = localStorage.getItem('token');
-  await axios.post(
-    `${API_BASE_URL}/push/subscribe`,
-    subscription.toJSON(),
-    {
-      headers: { Authorization: `Bearer ${token}` }
-    }
-  );
+  await apiClient.post('/push/subscribe', subscription.toJSON());
 
   return subscription;
 }
@@ -115,14 +103,7 @@ export async function unsubscribeUserFromPush() {
     await subscription.unsubscribe();
 
     // Notify backend
-    const token = localStorage.getItem('token');
-    if (token) {
-      await axios.post(
-        `${API_BASE_URL}/push/unsubscribe`,
-        { endpoint },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-    }
+    await apiClient.post('/push/unsubscribe', { endpoint });
   }
 }
 

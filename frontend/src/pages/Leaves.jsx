@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext } from 'react';
-import axios from 'axios';
+import apiClient from '../utils/apiClient';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
@@ -12,18 +12,9 @@ const Leaves = () => {
   const { theme } = useContext(ThemeContext);
   const isDark = theme === 'dark';
 
-  const getAuthToken = () => {
-    const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-    return userInfo?.token || localStorage.getItem('token');
-  };
-
   const fetchLeaves = async () => {
     try {
-      const token = getAuthToken();
-      const config = {
-        headers: { Authorization: `Bearer ${token}` },
-      };
-      const { data } = await axios.get('/api/leaves', config);
+      const { data } = await apiClient.get('/leaves');
       const list = Array.isArray(data) ? data : [];
       list.sort((a, b) => new Date(b.createdAt || b.fromDate || 0) - new Date(a.createdAt || a.fromDate || 0));
       setLeaves(list);
@@ -40,14 +31,10 @@ const Leaves = () => {
 
   const handleStatusUpdate = async (id, status) => {
     try {
-      const token = getAuthToken();
-      const config = {
-        headers: { Authorization: `Bearer ${token}` },
-      };
-      await axios.put(`/api/leaves/${id}/status`, { status }, config);
+      await apiClient.put(`/leaves/${id}/status`, { status });
       fetchLeaves();
     } catch (error) {
-      alert(error.response?.data?.message || 'Error updating status');
+      alert(error.message || 'Error updating status');
     }
   };
 

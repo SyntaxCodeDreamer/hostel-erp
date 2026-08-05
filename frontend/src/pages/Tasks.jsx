@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import axios from 'axios';
+import apiClient from '../utils/apiClient';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { Plus, Clock, User as UserIcon } from 'lucide-react';
@@ -16,11 +16,6 @@ const Tasks = () => {
 
   const isAdminOrLeader = user?.role === 'Admin' || user?.role === 'Leader' || user?.role === 'admin' || user?.role === 'leader';
 
-  const getAuthToken = () => {
-    const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-    return userInfo?.token || localStorage.getItem('token');
-  };
-
   useEffect(() => {
     fetchTasks();
     if (isAdminOrLeader) {
@@ -30,8 +25,7 @@ const Tasks = () => {
 
   const fetchTasks = async () => {
     try {
-      const token = getAuthToken();
-      const res = await axios.get('/api/tasks', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await apiClient.get('/tasks');
       setTasks(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error('Error fetching tasks:', error);
@@ -40,8 +34,7 @@ const Tasks = () => {
 
   const fetchStudentsForAssignment = async () => {
     try {
-      const token = getAuthToken();
-      const res = await axios.get('/api/students', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await apiClient.get('/students');
       setStudentsList(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error('Error fetching students for assignment:', error);
@@ -51,8 +44,7 @@ const Tasks = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const token = getAuthToken();
-      await axios.post('/api/tasks', formData, { headers: { Authorization: `Bearer ${token}` } });
+      await apiClient.post('/tasks', formData);
       setShowForm(false);
       setFormData({ title: '', description: '', assignedTo: '', priority: 'Medium', dueDate: '' });
       fetchTasks();
@@ -63,8 +55,7 @@ const Tasks = () => {
 
   const updateStatus = async (id, status) => {
     try {
-      const token = getAuthToken();
-      await axios.put(`/api/tasks/${id}/status`, { status }, { headers: { Authorization: `Bearer ${token}` } });
+      await apiClient.put(`/tasks/${id}/status`, { status });
       fetchTasks();
     } catch (error) {
       console.error('Error updating task status:', error);

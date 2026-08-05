@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import axios from 'axios';
+import apiClient from '../utils/apiClient';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { ShieldAlert, UserCheck, Plus, Trash2, Phone, Mail } from 'lucide-react';
@@ -21,11 +21,6 @@ const TrustLeader = () => {
   const userRoleLower = (user?.role || '').toLowerCase();
   const isAdmin = userRoleLower === 'admin';
 
-  const getAuthToken = () => {
-    const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-    return userInfo?.token || localStorage.getItem('token');
-  };
-
   useEffect(() => {
     fetchTrustMembers();
     fetchLeaders();
@@ -33,8 +28,7 @@ const TrustLeader = () => {
 
   const fetchTrustMembers = async () => {
     try {
-      const token = getAuthToken();
-      const res = await axios.get('/api/trust/members', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await apiClient.get('/trust/members');
       setMembers(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error('Error fetching trust members:', error);
@@ -43,8 +37,7 @@ const TrustLeader = () => {
 
   const fetchLeaders = async () => {
     try {
-      const token = getAuthToken();
-      const res = await axios.get('/api/trust/leaders', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await apiClient.get('/trust/leaders');
       setLeaders(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error('Error fetching leaders:', error);
@@ -55,18 +48,17 @@ const TrustLeader = () => {
     e.preventDefault();
     setErrorMsg('');
     try {
-      const token = getAuthToken();
       const payload = {
         ...memberData,
         joiningDate: memberData.joiningDate || new Date().toISOString().split('T')[0]
       };
-      await axios.post('/api/trust/members', payload, { headers: { Authorization: `Bearer ${token}` } });
+      await apiClient.post('/trust/members', payload);
       setShowForm(false);
       setMemberData({ name: '', email: '', position: '', contactNumber: '', joiningDate: new Date().toISOString().split('T')[0] });
       fetchTrustMembers();
     } catch (error) {
       console.error('Error creating member:', error);
-      setErrorMsg(error.response?.data?.message || 'Failed to add trust member');
+      setErrorMsg(error.message || 'Failed to add trust member');
     }
   };
 
@@ -74,21 +66,19 @@ const TrustLeader = () => {
     e.preventDefault();
     setErrorMsg('');
     try {
-      const token = getAuthToken();
-      await axios.post('/api/trust/leaders', leaderData, { headers: { Authorization: `Bearer ${token}` } });
+      await apiClient.post('/trust/leaders', leaderData);
       setShowForm(false);
       setLeaderData({ name: '', email: '', password: '', role: 'Leader', contactNumber: '', duration: '' });
       fetchLeaders();
     } catch (error) {
       console.error('Error creating leader:', error);
-      setErrorMsg(error.response?.data?.message || 'Failed to add leader account');
+      setErrorMsg(error.message || 'Failed to add leader account');
     }
   };
 
   const handleDeleteMember = async (id) => {
     try {
-      const token = getAuthToken();
-      await axios.delete(`/api/trust/members/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      await apiClient.delete(`/trust/members/${id}`);
       fetchTrustMembers();
     } catch (error) {
       console.error('Error deleting member:', error);
@@ -97,8 +87,7 @@ const TrustLeader = () => {
 
   const handleDeleteLeader = async (id) => {
     try {
-      const token = getAuthToken();
-      await axios.delete(`/api/trust/leaders/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      await apiClient.delete(`/trust/leaders/${id}`);
       fetchLeaders();
     } catch (error) {
       console.error('Error deleting leader:', error);
