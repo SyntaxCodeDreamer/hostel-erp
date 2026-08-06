@@ -4,7 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { SocketContext } from '../context/SocketContext';
 import { usePush } from '../context/PushContext';
-import { Bell, Sun, Moon, Menu, BellRing, Smartphone, Send, Check, AlertCircle, RefreshCw } from 'lucide-react';
+import { Bell, Sun, Moon, Menu, X, BellRing, Smartphone, Send, Check, AlertCircle, RefreshCw } from 'lucide-react';
 import apiClient from '../utils/apiClient';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -17,7 +17,33 @@ const DashboardLayout = () => {
   const location = useLocation();
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768;
+    }
+    return true;
+  });
+
+  // Automatically close sidebar on mobile when navigating between pages
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
+  }, [location.pathname]);
+
+  // Adjust sidebar open state when window resizes
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setIsSidebarOpen(false);
+      } else {
+        setIsSidebarOpen(true);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '' });
@@ -126,84 +152,104 @@ const DashboardLayout = () => {
   return (
     <div className={`flex h-screen font-sans transition-colors duration-200 ${isDark ? 'bg-[#090a0f] text-gray-100' : 'bg-gray-50 text-gray-800'}`}>
       
-      {/* Sidebar (Dynamic Theme Colors) */}
+      {/* Sidebar (Dynamic Theme Colors & Mobile Responsive Drawer) */}
       <AnimatePresence initial={false}>
         {isSidebarOpen && (
-          <motion.aside 
-            initial={{ width: 0, opacity: 0, x: -50 }}
-            animate={{ width: 256, opacity: 1, x: 0 }}
-            exit={{ width: 0, opacity: 0, x: -50 }}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
-            className={`flex flex-col shadow-lg border-r transition-colors duration-200 overflow-hidden whitespace-nowrap shrink-0 ${
-              isDark 
-                ? 'bg-[#0f111a] border-gray-800/80 text-gray-300' 
-                : 'bg-white border-gray-200 text-gray-700'
-            }`}
-          >
-            <div className="w-64 h-full flex flex-col">
-        
-        {/* Sidebar Header */}
-        <div className={`p-6 border-b flex items-center justify-between transition-colors ${
-          isDark ? 'border-gray-800/80' : 'border-gray-100'
-        }`}>
-          <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Hostel ERP</h1>
-        </div>
+          <>
+            {/* Mobile Backdrop Overlay */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-xs"
+              onClick={() => setIsSidebarOpen(false)}
+            />
 
-        {/* Sidebar Navigation Menu */}
-        <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
-          {[
-            { path: '/', label: 'Dashboard' },
-            { path: '/students', label: 'Students' },
-            { path: '/leaves', label: 'Leaves' },
-            { path: '/tasks', label: 'Tasks' },
-            { path: '/announcements', label: 'Announcements' },
-          ].map((item) => (
-            <Link 
-              key={item.path}
-              to={item.path} 
-              className={`block py-2.5 px-4 rounded-xl font-medium transition ${
-                location.pathname === item.path 
-                  ? 'bg-indigo-600 text-white shadow-sm font-semibold' 
-                  : isDark 
-                  ? 'text-gray-400 hover:bg-[#1a1c29] hover:text-white' 
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+            <motion.aside 
+              initial={{ width: 0, opacity: 0, x: -50 }}
+              animate={{ width: 256, opacity: 1, x: 0 }}
+              exit={{ width: 0, opacity: 0, x: -50 }}
+              transition={{ duration: 0.2, ease: "easeInOut" }}
+              className={`fixed inset-y-0 left-0 z-50 md:relative md:z-auto h-full flex flex-col shadow-xl border-r transition-colors duration-200 overflow-hidden whitespace-nowrap shrink-0 ${
+                isDark 
+                  ? 'bg-[#0f111a] border-gray-800/80 text-gray-300' 
+                  : 'bg-white border-gray-200 text-gray-700'
               }`}
             >
-              {item.label}
-            </Link>
-          ))}
+              <div className="w-64 h-full flex flex-col">
+          
+          {/* Sidebar Header */}
+          <div className={`p-6 border-b flex items-center justify-between transition-colors ${
+            isDark ? 'border-gray-800/80' : 'border-gray-100'
+          }`}>
+            <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Hostel ERP</h1>
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className={`md:hidden p-1.5 rounded-lg transition-colors ${
+                isDark ? 'hover:bg-gray-800 text-gray-400' : 'hover:bg-gray-100 text-gray-500'
+              }`}
+              title="Close sidebar"
+            >
+              <X size={20} />
+            </button>
+          </div>
 
-          {['admin', 'leader', 'trustee', 'trust member'].includes((user?.role || '').toLowerCase()) && (
-            <>
+          {/* Sidebar Navigation Menu */}
+          <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
+            {[
+              { path: '/', label: 'Dashboard' },
+              { path: '/students', label: 'Students' },
+              { path: '/leaves', label: 'Leaves' },
+              { path: '/tasks', label: 'Tasks' },
+              { path: '/announcements', label: 'Announcements' },
+            ].map((item) => (
               <Link 
-                to="/expenses" 
+                key={item.path}
+                to={item.path} 
                 className={`block py-2.5 px-4 rounded-xl font-medium transition ${
-                  location.pathname === '/expenses' 
+                  location.pathname === item.path 
                     ? 'bg-indigo-600 text-white shadow-sm font-semibold' 
                     : isDark 
                     ? 'text-gray-400 hover:bg-[#1a1c29] hover:text-white' 
                     : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                 }`}
               >
-                Expenses
+                {item.label}
               </Link>
-              <Link 
-                to="/trust-members" 
-                className={`block py-2.5 px-4 rounded-xl font-medium transition ${
-                  location.pathname === '/trust-members' 
-                    ? 'bg-indigo-600 text-white shadow-sm font-semibold' 
-                    : isDark 
-                    ? 'text-gray-400 hover:bg-[#1a1c29] hover:text-white' 
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                }`}
-              >
-                Trust & Leaders
-              </Link>
-            </>
-          )}
-        </nav>
-            </div>
-          </motion.aside>
+            ))}
+
+            {['admin', 'leader', 'trustee', 'trust member'].includes((user?.role || '').toLowerCase()) && (
+              <>
+                <Link 
+                  to="/expenses" 
+                  className={`block py-2.5 px-4 rounded-xl font-medium transition ${
+                    location.pathname === '/expenses' 
+                      ? 'bg-indigo-600 text-white shadow-sm font-semibold' 
+                      : isDark 
+                      ? 'text-gray-400 hover:bg-[#1a1c29] hover:text-white' 
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  Expenses
+                </Link>
+                <Link 
+                  to="/trust-members" 
+                  className={`block py-2.5 px-4 rounded-xl font-medium transition ${
+                    location.pathname === '/trust-members' 
+                      ? 'bg-indigo-600 text-white shadow-sm font-semibold' 
+                      : isDark 
+                      ? 'text-gray-400 hover:bg-[#1a1c29] hover:text-white' 
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  Trust & Leaders
+                </Link>
+              </>
+            )}
+          </nav>
+              </div>
+            </motion.aside>
+          </>
         )}
       </AnimatePresence>
 
