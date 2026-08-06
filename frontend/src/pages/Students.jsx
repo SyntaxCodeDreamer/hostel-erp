@@ -28,6 +28,7 @@ const Students = () => {
   const [progressSaving, setProgressSaving] = useState(false);
 
   const isStudent = (user?.role || '').toLowerCase() === 'student';
+  const isAdmin = (user?.role || '').toLowerCase() === 'admin';
 
   const handleAddProgress = async (e) => {
     e.preventDefault();
@@ -279,7 +280,7 @@ const Students = () => {
           <h1 className="text-2xl font-bold tracking-tight">{isStudent ? 'My Student Profile' : 'Student Directory'}</h1>
           <p className="text-sm opacity-70">{isStudent ? 'View and update your personal hostel details' : 'Manage and track student resident records.'}</p>
         </div>
-        {!isStudent && (
+        {isAdmin && (
           <Link 
             to="/students/add" 
             className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 transition shadow-sm"

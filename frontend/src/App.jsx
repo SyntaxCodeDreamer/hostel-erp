@@ -46,7 +46,7 @@ function App() {
                     <Route index element={<Dashboard />} />
                     <Route path="students" element={<Students />} />
                     <Route path="students/add" element={
-                      <ProtectedRoute allowedRoles={['Admin', 'Leader']}>
+                      <ProtectedRoute allowedRoles={['Admin']}>
                         <AddStudent />
                       </ProtectedRoute>
                     } />
