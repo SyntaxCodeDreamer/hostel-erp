@@ -2,7 +2,7 @@ import React, { useEffect, useState, useContext } from 'react';
 import apiClient from '../utils/apiClient';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { Eye, X, Phone, MapPin, GraduationCap, Edit3, Save, CheckCircle, ExternalLink, Link as LinkIcon, TrendingUp, Plus, Trash2, Award, FileText, Sparkles } from 'lucide-react';
+import { Eye, X, Phone, MapPin, GraduationCap, Edit3, Save, CheckCircle, ExternalLink, Link as LinkIcon, TrendingUp, Plus, Trash2, Award, FileText } from 'lucide-react';
 
 const Students = () => {
   const [students, setStudents] = useState([]);
@@ -568,7 +568,7 @@ const Students = () => {
                     {showProgressForm && (
                       <form onSubmit={handleAddProgress} className="bg-[#141622] p-4 rounded-xl border border-indigo-500/30 mb-4 space-y-4 shadow-lg">
                         <h4 className="text-xs font-bold text-indigo-400 uppercase flex items-center gap-1">
-                          <Sparkles size={14} /> Add New Progress Record
+                          <TrendingUp size={14} /> Add New Progress Record
                         </h4>
 
                         {progressError && (
@@ -737,7 +737,7 @@ const Students = () => {
           </div>
         ) : (
           <div className="p-8 text-center bg-[#14161f] border border-gray-800 rounded-2xl text-gray-400">
-            <Sparkles className="mx-auto mb-2 text-indigo-400" size={24} />
+            <GraduationCap className="mx-auto mb-2 text-indigo-400" size={24} />
             <p className="text-sm font-medium">Setting up your student profile...</p>
           </div>
         )
@@ -1151,7 +1151,7 @@ const Students = () => {
                     {showProgressForm && (
                       <form onSubmit={handleAddProgress} className="bg-[#141622] p-4 rounded-xl border border-indigo-500/30 mb-4 space-y-4 shadow-lg">
                         <h4 className="text-xs font-bold text-indigo-400 uppercase flex items-center gap-1">
-                          <Sparkles size={14} /> Add New Progress Record
+                          <TrendingUp size={14} /> Add New Progress Record
                         </h4>
 
                         {progressError && (

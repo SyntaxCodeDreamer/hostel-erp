@@ -6,7 +6,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import {
-  Users, Calendar, CheckSquare, Wallet, Sparkles, TrendingUp, Activity, Megaphone, Award, FileText, ExternalLink, Layers
+  Users, Calendar, CheckSquare, Wallet, BookOpen, TrendingUp, Activity, Megaphone, Award, FileText, ExternalLink, Layers
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -148,7 +148,7 @@ const Dashboard = () => {
         <div className={`flex items-center gap-2 border px-4 py-2 rounded-xl text-xs font-semibold shadow-xs self-start sm:self-auto ${
           isDark ? 'bg-[#1a1c26] border-purple-900/50 text-purple-300' : 'bg-indigo-50 border-indigo-200 text-indigo-700'
         }`}>
-          <Sparkles size={16} className={isDark ? 'text-purple-400' : 'text-indigo-600'} />
+          <Calendar size={16} className={isDark ? 'text-purple-400' : 'text-indigo-600'} />
           <span>Academic Term 2026</span>
         </div>
       </motion.div>
@@ -366,7 +366,7 @@ const Dashboard = () => {
 
           {recentProgressList.length === 0 ? (
             <div className={`p-8 text-center rounded-xl border border-dashed ${isDark ? 'border-gray-800 text-gray-400' : 'border-gray-300 text-gray-500'}`}>
-              <Sparkles size={24} className="mx-auto text-indigo-500 mb-2 opacity-60" />
+              <Activity size={24} className="mx-auto text-indigo-500 mb-2 opacity-60" />
               <p className="text-sm font-medium">No progress report items submitted yet.</p>
               <p className="text-xs mt-1 opacity-75">Student custom progress records will automatically appear in this live flowchart node graph!</p>
             </div>
@@ -484,7 +484,7 @@ const Dashboard = () => {
         >
           <div>
             <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <Sparkles size={20} /> Residency Regulations
+              <BookOpen size={20} /> Residency Regulations
             </h3>
             <ul className="space-y-3 text-xs leading-relaxed text-indigo-100">
               <li className="flex items-start gap-2">

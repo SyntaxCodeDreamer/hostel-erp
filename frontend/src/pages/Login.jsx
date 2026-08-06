@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { ShieldAlert, User as UserIcon, GraduationCap, Sparkles, BellRing, X } from 'lucide-react';
+import { ShieldAlert, User as UserIcon, GraduationCap, Building2, BellRing, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { subscribeUserToPush } from '../utils/pushManager';
 
@@ -94,7 +94,7 @@ const Login = () => {
         {/* Header */}
         <div className="text-center">
           <div className="inline-flex p-3 rounded-2xl bg-indigo-950/60 border border-indigo-800/40 text-indigo-400 mb-3 shadow-inner">
-            <Sparkles size={28} />
+            <Building2 size={28} />
           </div>
           <h2 className="text-2xl font-extrabold text-white tracking-tight">
             Hostel ERP Login
