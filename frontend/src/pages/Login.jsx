@@ -17,16 +17,6 @@ const Login = () => {
   const handleRoleSelect = (selectedRole) => {
     setRole(selectedRole);
     setError('');
-    if (selectedRole === 'Admin') {
-      setEmail('admin@example.com');
-      setPassword('password123');
-    } else if (selectedRole === 'Student') {
-      setEmail('student1@example.com');
-      setPassword('password123');
-    } else if (selectedRole === 'Captain') {
-      setEmail('leader@example.com');
-      setPassword('password123');
-    }
   };
 
   const submitHandler = async (e) => {
