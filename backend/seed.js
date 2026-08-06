@@ -30,23 +30,25 @@ const importData = async () => {
     await Task.deleteMany();
     await TrustMember.deleteMany();
 
-    const adminEmail = process.env.ADMIN_EMAIL;
-    const adminPassword = process.env.ADMIN_PASSWORD;
+    const email = process.argv[2] || process.env.ADMIN_EMAIL;
+    const password = process.argv[3] || process.env.ADMIN_PASSWORD;
 
-    if (!adminEmail || !adminPassword) {
-      throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required in .env');
+    if (!email || !password) {
+      console.error('\nUsage: node seed.js <admin_email> <admin_password>');
+      console.error('Example: node seed.js admin@domain.com mySecurePassword123\n');
+      process.exit(1);
     }
 
-    console.log(`Creating Admin user ${adminEmail}...`);
+    console.log(`Creating Admin account in MongoDB Atlas for: ${email}`);
     const admin = await User.create({
-      name: 'Admin User',
-      email: adminEmail,
-      password: adminPassword,
+      name: 'Admin',
+      email: email,
+      password: password,
       role: 'Admin'
     });
 
-    console.log('Database cleared and Admin account created successfully in MongoDB Atlas!');
-    console.log(`Admin Email: ${admin.email}`);
+    console.log('Database cleared and Admin account successfully created in MongoDB!');
+    console.log(`Stored Admin Email in MongoDB: ${admin.email}`);
     process.exit(0);
   } catch (error) {
     console.error(`Error resetting database: ${error}`);

@@ -12,7 +12,7 @@ const getMaskedPassword = (pass) => {
 
 const sendWelcomeEmail = async ({ name, email, role, password }) => {
   const apiKey = process.env.BREVO_API;
-  const senderEmail = process.env.BREVO_SENDER_EMAIL || 'kevalnagaria010@gmail.com';
+  const senderEmail = process.env.BREVO_SENDER_EMAIL;
 
   if (!apiKey) {
     console.warn('BREVO_API key is not configured in .env file.');
