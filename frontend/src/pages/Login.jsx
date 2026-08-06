@@ -5,8 +5,8 @@ import { ShieldAlert, User as UserIcon, GraduationCap, Sparkles, BellRing, X } f
 import { motion } from 'framer-motion';
 
 const Login = () => {
-  const [email, setEmail] = useState('kevalnagaria010@gmail.com');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [role, setRole] = useState('Admin');
   const [loading, setLoading] = useState(false);
@@ -18,11 +18,14 @@ const Login = () => {
     setRole(selectedRole);
     setError('');
     if (selectedRole === 'Admin') {
-      setEmail('kevalnagaria010@gmail.com');
+      setEmail('admin@example.com');
       setPassword('password123');
-    } else {
-      setEmail('');
-      setPassword('');
+    } else if (selectedRole === 'Student') {
+      setEmail('student1@example.com');
+      setPassword('password123');
+    } else if (selectedRole === 'Captain') {
+      setEmail('leader@example.com');
+      setPassword('password123');
     }
   };
 

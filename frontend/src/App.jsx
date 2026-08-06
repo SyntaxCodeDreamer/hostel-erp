@@ -22,7 +22,7 @@ const TrustLeader = lazy(() => import('./pages/TrustLeader'));
 
 // Sleek loading spinner fallback for route transitions
 const PageLoader = () => (
-  <div className="flex items-center justify-center min-h-screen bg-[#090a0f] text-white">
+  <div className="flex items-center justify-center min-h-[60vh]">
     <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500"></div>
   </div>
 );
@@ -46,7 +46,7 @@ function App() {
                     <Route index element={<Dashboard />} />
                     <Route path="students" element={<Students />} />
                     <Route path="students/add" element={
-                      <ProtectedRoute allowedRoles={['Admin']}>
+                      <ProtectedRoute allowedRoles={['Admin', 'Leader']}>
                         <AddStudent />
                       </ProtectedRoute>
                     } />

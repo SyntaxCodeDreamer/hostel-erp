@@ -8,23 +8,11 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const userInfo = localStorage.getItem('userInfo');
-      if (userInfo && userInfo !== 'undefined' && userInfo !== 'null') {
-        setUser(JSON.parse(userInfo));
-      } else {
-        localStorage.removeItem('userInfo');
-        localStorage.removeItem('token');
-        setUser(null);
-      }
-    } catch (e) {
-      console.error('Failed to parse userInfo from localStorage:', e);
-      localStorage.removeItem('userInfo');
-      localStorage.removeItem('token');
-      setUser(null);
-    } finally {
-      setLoading(false);
+    const userInfo = localStorage.getItem('userInfo');
+    if (userInfo) {
+      setUser(JSON.parse(userInfo));
     }
+    setLoading(false);
   }, []);
 
   const login = async (email, password) => {
@@ -43,7 +31,6 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('userInfo');
-    localStorage.removeItem('token');
     setUser(null);
   };
 
