@@ -1,13 +1,22 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import apiClient from '../utils/apiClient';
 import { useNavigate, Link } from 'react-router-dom';
 import { ThemeContext } from '../context/ThemeContext';
+import { AuthContext } from '../context/AuthContext';
 import { ArrowLeft, Save } from 'lucide-react';
 
 const AddStudent = () => {
   const { theme } = useContext(ThemeContext);
+  const { user } = useContext(AuthContext);
   const isDark = theme === 'dark';
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const roleLower = (user?.role || '').toLowerCase();
+    if (user && roleLower !== 'admin') {
+      navigate('/students');
+    }
+  }, [user, navigate]);
 
   const [formData, setFormData] = useState({
     name: '',
