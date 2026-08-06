@@ -15,7 +15,7 @@ const { protect, authorize } = require('../middleware/authMiddleware');
 
 router.route('/')
   .get(protect, getStudents)
-  .post(protect, authorize('Admin', 'admin'), createStudent);
+  .post(protect, authorize('Admin', 'Leader'), createStudent);
 
 router.route('/me')
   .get(protect, getMyStudentProfile)
@@ -33,6 +33,6 @@ router.route('/:id/progress/:itemId')
 router.route('/:id')
   .get(protect, getStudentById)
   .put(protect, updateStudent)
-  .delete(protect, authorize('Admin', 'admin'), deleteStudent);
+  .delete(protect, authorize('Admin', 'admin', 'Leader', 'leader'), deleteStudent);
 
 module.exports = router;
