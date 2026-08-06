@@ -151,7 +151,6 @@ const Dashboard = () => {
           <Sparkles size={16} className={isDark ? 'text-purple-400' : 'text-indigo-600'} />
           <span>Academic Term 2026</span>
         </div>
-        <button onClick={handleRefresh} className={`ml-4 px-3 py-1 rounded ${isDark ? 'bg-indigo-700 text-white' : 'bg-indigo-100 text-indigo-800'}`}>Refresh</button>
       </motion.div>
 
       {/* 4 Stat Overview Cards */}
