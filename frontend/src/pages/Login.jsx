@@ -8,7 +8,7 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [role, setRole] = useState('Admin');
+  const [role, setRole] = useState('Trust Member');
   const [loading, setLoading] = useState(false);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const { login } = useContext(AuthContext);
@@ -101,11 +101,11 @@ const Login = () => {
         <div className="grid grid-cols-3 gap-3">
           <button 
             type="button"
-            onClick={() => handleRoleSelect('Admin')}
-            className={`flex flex-col items-center p-3 rounded-xl border transition text-center ${role === 'Admin' ? 'border-indigo-500 bg-indigo-950/70 text-white shadow-sm' : 'border-gray-800 bg-[#1a1c26] text-gray-400 hover:border-gray-700 hover:text-white'}`}
+            onClick={() => handleRoleSelect('Trust Member')}
+            className={`flex flex-col items-center p-3 rounded-xl border transition text-center ${role === 'Trust Member' ? 'border-indigo-500 bg-indigo-950/70 text-white shadow-sm' : 'border-gray-800 bg-[#1a1c26] text-gray-400 hover:border-gray-700 hover:text-white'}`}
           >
             <ShieldAlert size={20} className="mb-1 text-indigo-400" />
-            <span className="text-xs font-bold">Admin</span>
+            <span className="text-xs font-bold">Trust Member</span>
           </button>
 
           <button 
