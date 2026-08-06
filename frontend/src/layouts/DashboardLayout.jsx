@@ -322,101 +322,45 @@ const DashboardLayout = () => {
               
               <AnimatePresence>
                 {showNotifications && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    transition={{ duration: 0.2 }}
-                    className={`absolute right-0 mt-2 w-80 sm:w-96 rounded-xl shadow-2xl border py-2 max-h-[28rem] overflow-y-auto z-50 ${isDark ? 'bg-[#181a26] border-gray-800 text-gray-200' : 'bg-white border-gray-100 text-gray-800'}`}
-                  >
-                    <div className="px-4 py-2 border-b border-gray-700/50 flex justify-between items-center">
-                      <h3 className="font-bold text-sm">Notifications</h3>
-                      <span className="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full">{unreadCount} New</span>
-                    </div>
-
-                    {/* Web Push Notification Quick Card Banner */}
-                    <div className={`m-3 p-3 rounded-lg border text-xs flex flex-col gap-2 ${
-                      isDark ? 'bg-indigo-950/30 border-indigo-800/50' : 'bg-indigo-50 border-indigo-200'
-                    }`}>
-                      <div className="flex items-center justify-between font-semibold">
-                        <span className="flex items-center gap-1.5 text-indigo-400">
-                          <Smartphone size={14} /> Web Push Device Status
-                        </span>
-                        {isSubscribed ? (
-                          <span className="text-emerald-400 font-bold flex items-center gap-1">
-                            <Check size={12} /> Active
-                          </span>
-                        ) : (
-                          <span className="text-amber-400 font-bold flex items-center gap-1">
-                            <AlertCircle size={12} /> Not Enabled
-                          </span>
-                        )}
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40 sm:hidden" 
+                      onClick={() => setShowNotifications(false)} 
+                    />
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      transition={{ duration: 0.2 }}
+                      className={`fixed inset-x-4 top-16 sm:absolute sm:inset-auto sm:top-full sm:right-0 sm:mt-2 sm:w-96 rounded-2xl shadow-2xl border py-2 max-h-[28rem] overflow-y-auto z-50 ${isDark ? 'bg-[#181a26] border-gray-800 text-gray-200' : 'bg-white border-gray-100 text-gray-800'}`}
+                    >
+                      <div className="px-4 py-3 border-b border-gray-700/50 flex justify-between items-center">
+                        <h3 className="font-bold text-sm">Notifications</h3>
+                        <span className="text-xs bg-indigo-600 text-white px-2.5 py-0.5 rounded-full font-semibold">{unreadCount} New</span>
                       </div>
-                      <p className="text-gray-400 text-[11px]">
-                        {isSubscribed 
-                          ? 'Device notifications are active even when browser is closed.'
-                          : 'Get app-style push notifications directly on your device screen.'}
-                      </p>
 
-                      {pushMsg && (
-                        <div className={`p-1.5 rounded text-[11px] font-medium ${
-                          pushMsg.type === 'error' ? 'bg-red-900/40 text-red-300' : 'bg-emerald-900/40 text-emerald-300'
-                        }`}>
-                          {pushMsg.text}
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2 mt-1">
-                        {!isSubscribed ? (
-                          <button
-                            onClick={subscribePush}
-                            disabled={pushLoading}
-                            className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-md transition flex items-center justify-center gap-1 shadow"
+                      {notifications.length > 0 ? (
+                        notifications.map(n => (
+                          <div 
+                            key={n._id} 
+                            onClick={() => handleNotificationClick(n)}
+                            className={`px-4 py-3 border-b border-gray-800/40 cursor-pointer transition ${!n.isRead ? 'bg-indigo-900/20' : 'hover:bg-gray-800/40'}`}
                           >
-                            {pushLoading ? <RefreshCw size={12} className="animate-spin" /> : <BellRing size={12} />} Enable Device Push
-                          </button>
-                        ) : (
-                          <>
-                            <button
-                              onClick={sendTestPush}
-                              disabled={pushLoading}
-                              className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-md transition flex items-center justify-center gap-1 shadow"
-                            >
-                              <Send size={12} /> Test Push
-                            </button>
-                            <button
-                              onClick={unsubscribePush}
-                              disabled={pushLoading}
-                              className="py-1.5 px-3 bg-gray-700 hover:bg-gray-600 text-gray-200 font-semibold rounded-md transition"
-                            >
-                              Disable
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {notifications.length > 0 ? (
-                      notifications.map(n => (
-                        <div 
-                          key={n._id} 
-                          onClick={() => handleNotificationClick(n)}
-                          className={`px-4 py-3 border-b border-gray-800/40 cursor-pointer transition ${!n.isRead ? 'bg-indigo-900/20' : 'hover:bg-gray-800/40'}`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <p className={`text-sm ${!n.isRead ? 'font-semibold text-white' : 'text-gray-300'}`}>{n.title}</p>
-                            {!n.isRead && (
-                              <span className="h-2 w-2 rounded-full bg-indigo-500 flex-shrink-0" title="Unread"></span>
-                            )}
+                            <div className="flex items-center justify-between gap-2">
+                              <p className={`text-sm ${!n.isRead ? 'font-semibold text-white' : 'text-gray-300'}`}>{n.title}</p>
+                              {!n.isRead && (
+                                <span className="h-2 w-2 rounded-full bg-indigo-500 flex-shrink-0" title="Unread"></span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-400 mt-1">{n.message}</p>
+                            <p className="text-xs text-gray-500 mt-2">{new Date(n.createdAt).toLocaleDateString()}</p>
                           </div>
-                          <p className="text-xs text-gray-400 mt-1">{n.message}</p>
-                          <p className="text-xs text-gray-500 mt-2">{new Date(n.createdAt).toLocaleDateString()}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="px-4 py-6 text-center text-sm text-gray-400">No notifications</div>
-                    )}
-                  </motion.div>
+                        ))
+                      ) : (
+                        <div className="px-4 py-6 text-center text-sm text-gray-400">No notifications</div>
+                      )}
+                    </motion.div>
+                  </>
                 )}
               </AnimatePresence>
             </div>
