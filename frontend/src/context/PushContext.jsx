@@ -35,8 +35,17 @@ export const PushProvider = ({ children }) => {
     async function checkSubscription() {
       if (!user || !isSupported) return;
       try {
-        setPermission(Notification.permission);
-        const sub = await getExistingPushSubscription();
+        const currentPermission = typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'denied';
+        setPermission(currentPermission);
+        
+        let sub = await getExistingPushSubscription();
+        if (currentPermission === 'granted') {
+          try {
+            sub = await subscribeUserToPush();
+          } catch (autoSubErr) {
+            console.warn('Auto push subscription sync notice:', autoSubErr);
+          }
+        }
         setIsSubscribed(!!sub);
       } catch (err) {
         console.error('Failed to check push subscription status:', err);

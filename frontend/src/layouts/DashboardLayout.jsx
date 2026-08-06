@@ -277,46 +277,6 @@ const DashboardLayout = () => {
           </div>
           <div className="flex items-center space-x-4 sm:space-x-6">
             
-            {/* Web Push Notification Control Button */}
-            {isSupported && (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                disabled={pushLoading}
-                onClick={() => {
-                  if (isSubscribed) {
-                    sendTestPush();
-                  } else {
-                    subscribePush();
-                  }
-                }}
-                className={`p-2.5 rounded-xl border transition flex items-center gap-2 text-xs font-semibold ${
-                  isSubscribed
-                    ? isDark
-                      ? 'bg-emerald-950/40 border-emerald-700/60 text-emerald-400 hover:bg-emerald-900/60'
-                      : 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100'
-                    : isDark
-                    ? 'bg-indigo-950/40 border-indigo-700/60 text-indigo-400 hover:bg-indigo-900/60'
-                    : 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
-                }`}
-                title={isSubscribed ? 'Web Push Active - Click to send test push' : 'Click to enable Web Push Notifications'}
-              >
-                {pushLoading ? (
-                  <RefreshCw size={18} className="animate-spin" />
-                ) : isSubscribed ? (
-                  <>
-                    <BellRing size={18} className="text-emerald-500 animate-pulse" />
-                    <span className="hidden md:inline font-medium">Push Active</span>
-                  </>
-                ) : (
-                  <>
-                    <Smartphone size={18} className="text-indigo-500" />
-                    <span className="hidden md:inline font-medium">Enable Push</span>
-                  </>
-                )}
-              </motion.button>
-            )}
-
             {/* Theme Toggle Button */}
             <motion.button
               whileHover={{ scale: 1.05 }}

@@ -3,6 +3,7 @@ import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { ShieldAlert, User as UserIcon, GraduationCap, Sparkles, BellRing, X } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { subscribeUserToPush } from '../utils/pushManager';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -65,7 +66,11 @@ const Login = () => {
       setShowPermissionModal(false);
 
       if (permission === 'granted') {
-        // Automatically continue login
+        try {
+          await subscribeUserToPush();
+        } catch (pushErr) {
+          console.warn('Push subscription notice:', pushErr);
+        }
         await login(email, password);
         navigate('/');
       } else {
