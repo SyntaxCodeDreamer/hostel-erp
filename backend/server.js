@@ -63,7 +63,6 @@ const trustRoutes = require('./routes/trustRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const pushRoutes = require('./routes/pushRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
-const uploadRoutes = require('./routes/uploadRoutes');
 const fs = require('fs');
 const path = require('path');
 
@@ -74,12 +73,6 @@ app.use(async (req, res, next) => {
   }
   next();
 });
-
-// Ensure uploads directory exists
-// const uploadsDir = path.join(__dirname, 'uploads');
-// if (!fs.existsSync(uploadsDir)) {
-//   fs.mkdirSync(uploadsDir, { recursive: true });
-// }
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -92,16 +85,13 @@ app.use('/api/trust', trustRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/analytics', analyticsRoutes);
-app.use('/api/upload', uploadRoutes);
-
-app.use('/uploads', express.static(uploadsDir));
 
 // Serve Frontend Static Production Build
 const frontendDistPath = path.join(__dirname, '../frontend/dist');
 if (fs.existsSync(frontendDistPath)) {
   app.use(express.static(frontendDistPath));
   app.use((req, res, next) => {
-    if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.startsWith('/uploads')) {
+    if (req.method === 'GET' && !req.path.startsWith('/api')) {
       return res.sendFile(path.join(frontendDistPath, 'index.html'));
     }
     next();
