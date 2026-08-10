@@ -15,6 +15,7 @@ const Announcements = () => {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState({ title: '', description: '', category: 'General', targetAudience: 'All', isPinned: false });
   const userRole = (user?.role || '').toLowerCase();
   const isAdminOrLeader = ['admin', 'leader', 'trust member', 'trustee'].includes(userRole);
 

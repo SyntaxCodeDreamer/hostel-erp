@@ -17,6 +17,7 @@ const Tasks = () => {
 
   const [studentsList, setStudentsList] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState({ title: '', description: '', assignedTo: '', priority: 'Medium', dueDate: '' });
   const userRole = (user?.role || '').toLowerCase();
   const isAdminOrLeader = ['admin', 'leader', 'trust member', 'trustee'].includes(userRole);
 
