@@ -92,7 +92,7 @@ const Tasks = () => {
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Chores Tasks Board</h1>
+          <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Tasks</h1>
           <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Assign and trace weekly hostel chore completions.</p>
         </div>
         {isAdminOrLeader && (

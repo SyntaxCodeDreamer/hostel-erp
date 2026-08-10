@@ -81,7 +81,7 @@ const Expenses = () => {
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Accounting & Expense Ledger</h1>
+          <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Expenses</h1>
           <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Record mess supply catering invoices and utility receipts.</p>
         </div>
         {isAdminOrLeader && (

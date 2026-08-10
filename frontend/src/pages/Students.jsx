@@ -277,7 +277,7 @@ const Students = () => {
     <div className="p-2 sm:p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{isStudent ? 'My Student Profile' : 'Student Directory'}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{isStudent ? 'My Student Profile' : 'Students'}</h1>
           <p className="text-sm opacity-70">{isStudent ? 'View and update your personal hostel details' : 'Manage and track student resident records.'}</p>
         </div>
         {isAdmin && (

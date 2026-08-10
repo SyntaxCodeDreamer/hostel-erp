@@ -106,7 +106,7 @@ const TrustLeader = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Trust & Leadership Directory</h1>
+          <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Trust & Leaders</h1>
           <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{isAdmin ? 'Manage hostel trust members and appointed student leaders.' : 'Directory of hostel trust members and appointed student leaders.'}</p>
         </div>
         {isAdmin && (

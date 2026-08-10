@@ -81,7 +81,7 @@ const Leaves = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Leave Tracker</h1>
+          <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Leaves</h1>
           <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Track and verify student resident out-of-hostel requests.</p>
         </div>
         {(user?.role === 'Student' || user?.role === 'student') && (
