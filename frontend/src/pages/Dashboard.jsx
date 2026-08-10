@@ -26,7 +26,8 @@ const itemVariants = {
 const Dashboard = () => {
   const { user } = useContext(AuthContext);
   const { theme } = useContext(ThemeContext);
-  const isAdminOrLeader = user?.role === 'Admin' || user?.role === 'Leader' || user?.role === 'admin' || user?.role === 'leader';
+  const userRole = (user?.role || '').toLowerCase();
+  const isAdminOrLeader = ['admin', 'leader', 'trust member', 'trustee'].includes(userRole);
   const [data, setData] = useState(null);
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
