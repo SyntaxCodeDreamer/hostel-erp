@@ -29,14 +29,20 @@ const AddStudent = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const [submitting, setSubmitting] = useState(false);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
+    if (submitting) return;
     try {
+      setSubmitting(true);
       await apiClient.post('/students', formData);
       navigate('/students');
     } catch (error) {
       setErrorMsg(error.message || 'Error creating student');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -132,8 +138,21 @@ const AddStudent = () => {
           </div>
 
           <div className="flex justify-end pt-4">
-            <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-md transition flex items-center gap-2">
-              <Save size={18} /> Save & Register Student
+            <button 
+              type="submit" 
+              disabled={submitting} 
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-3 rounded-xl font-bold shadow-md transition flex items-center gap-2"
+            >
+              {submitting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Registering Student...
+                </>
+              ) : (
+                <>
+                  <Save size={18} /> Save & Register Student
+                </>
+              )}
             </button>
           </div>
         </form>

@@ -14,6 +14,33 @@ const getTasks = async (req, res) => {
       query.assignedTo = req.user._id;
     }
 
+    const { page, limit } = req.query;
+
+    if (page) {
+      const pageNum = parseInt(page, 10) || 1;
+      const limitNum = parseInt(limit, 10) || 6;
+      const skip = (pageNum - 1) * limitNum;
+
+      const totalCount = await Task.countDocuments(query);
+      const tasks = await Task.find(query)
+        .populate('assignedTo', 'name email role')
+        .populate('createdBy', 'name role')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum);
+
+      const totalPages = Math.ceil(totalCount / limitNum) || 1;
+      const hasMore = pageNum < totalPages;
+
+      return res.json({
+        data: tasks,
+        page: pageNum,
+        totalPages,
+        hasMore,
+        totalCount
+      });
+    }
+
     const tasks = await Task.find(query)
       .populate('assignedTo', 'name email role')
       .populate('createdBy', 'name role')

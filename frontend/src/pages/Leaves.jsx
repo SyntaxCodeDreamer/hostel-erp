@@ -3,11 +3,16 @@ import apiClient from '../utils/apiClient';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
-import { Calendar, Plus, MapPin } from 'lucide-react';
+import { Calendar, Plus, MapPin, Search } from 'lucide-react';
 
 const Leaves = () => {
   const [leaves, setLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+
   const { user } = useContext(AuthContext);
   const { theme } = useContext(ThemeContext);
   const isDark = theme === 'dark';
@@ -77,6 +82,15 @@ const Leaves = () => {
 
   const isAdminOrLeader = user?.role === 'Admin' || user?.role === 'Leader' || user?.role === 'admin' || user?.role === 'leader';
 
+  const filteredLeaves = leaves.filter((leave) => {
+    const status = (leave.status || '').toLowerCase();
+    return statusFilter === 'All' || status === statusFilter.toLowerCase();
+  });
+
+  const totalPages = Math.ceil(filteredLeaves.length / itemsPerPage) || 1;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedLeaves = filteredLeaves.slice(startIndex, startIndex + itemsPerPage);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -95,15 +109,40 @@ const Leaves = () => {
         )}
       </div>
 
+      {/* Filter Bar */}
+      <div className="flex justify-end items-center gap-2">
+        <label className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Status Filter:</label>
+        <select
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setCurrentPage(1);
+          }}
+          className={`border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+            isDark ? 'bg-[#14161f] border-gray-800 text-white' : 'bg-white border-gray-200 text-gray-900'
+          }`}
+        >
+          <option value="All">All Statuses</option>
+          <option value="Pending">Pending</option>
+          <option value="Approved">Approved</option>
+          <option value="Rejected">Rejected</option>
+        </select>
+      </div>
+
       {loading ? (
         <div className="flex justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
         </div>
       ) : (
         <div className={`rounded-2xl border overflow-hidden shadow-sm ${isDark ? 'bg-[#14161f] border-gray-800' : 'bg-white border-gray-200'}`}>
-          <div className={`p-4 border-b font-bold text-sm flex items-center gap-2 ${isDark ? 'border-gray-800/60 text-white' : 'border-gray-100 text-gray-900'}`}>
-            <Calendar size={16} className="text-indigo-600 dark:text-indigo-400" />
-            Leave History Logs
+          <div className={`p-4 border-b font-bold text-sm flex items-center justify-between ${isDark ? 'border-gray-800/60 text-white' : 'border-gray-100 text-gray-900'}`}>
+            <div className="flex items-center gap-2">
+              <Calendar size={16} className="text-indigo-600 dark:text-indigo-400" />
+              <span>Leave History Logs</span>
+            </div>
+            <span className="text-xs font-medium opacity-60">
+              Showing {filteredLeaves.length} record{filteredLeaves.length !== 1 ? 's' : ''}
+            </span>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y text-sm">
@@ -120,7 +159,7 @@ const Leaves = () => {
                 </tr>
               </thead>
               <tbody className={`divide-y ${isDark ? 'divide-gray-800/40' : 'divide-gray-100'}`}>
-                {leaves.map((leave) => {
+                {paginatedLeaves.map((leave) => {
                   const sName = getStudentName(leave);
                   const room = getRoom(leave);
                   const statusLower = (leave.status || 'pending').toLowerCase();
@@ -173,7 +212,7 @@ const Leaves = () => {
                     </tr>
                   );
                 })}
-                {leaves.length === 0 && (
+                {filteredLeaves.length === 0 && (
                   <tr>
                     <td colSpan={isAdminOrLeader ? 6 : 5} className={`px-6 py-8 text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                       No leave requests found.
@@ -183,6 +222,59 @@ const Leaves = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Controls Footer */}
+          {filteredLeaves.length > 0 && (
+            <div className={`px-6 py-4 border-t flex flex-wrap items-center justify-between gap-4 text-xs ${
+              isDark ? 'border-gray-800 text-gray-400 bg-[#14161f]' : 'border-gray-200 text-gray-600 bg-gray-50'
+            }`}>
+              <div>
+                Showing <span className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{startIndex + 1}</span> to{' '}
+                <span className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{Math.min(startIndex + itemsPerPage, filteredLeaves.length)}</span> of{' '}
+                <span className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{filteredLeaves.length}</span> leave requests
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  className={`px-3 py-1.5 rounded-lg border font-medium transition disabled:opacity-40 disabled:cursor-not-allowed ${
+                    isDark ? 'border-gray-700 bg-[#1a1c26] text-white hover:bg-gray-800' : 'border-gray-300 bg-white text-gray-800 hover:bg-gray-100'
+                  }`}
+                >
+                  Previous
+                </button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                        currentPage === pageNum
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : isDark
+                          ? 'border border-gray-700 bg-[#1a1c26] text-gray-300 hover:bg-gray-800'
+                          : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  className={`px-3 py-1.5 rounded-lg border font-medium transition disabled:opacity-40 disabled:cursor-not-allowed ${
+                    isDark ? 'border-gray-700 bg-[#1a1c26] text-white hover:bg-gray-800' : 'border-gray-300 bg-white text-gray-800 hover:bg-gray-100'
+                  }`}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

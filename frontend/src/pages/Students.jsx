@@ -678,9 +678,16 @@ const Students = () => {
                           <button
                             type="submit"
                             disabled={progressSaving}
-                            className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-md transition"
+                            className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg shadow-md transition flex items-center gap-1.5"
                           >
-                            {progressSaving ? 'Saving...' : 'Create Progress Record'}
+                            {progressSaving ? (
+                              <>
+                                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                Saving...
+                              </>
+                            ) : (
+                              'Create Progress Record'
+                            )}
                           </button>
                         </div>
                       </form>

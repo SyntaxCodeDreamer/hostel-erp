@@ -10,39 +10,94 @@ const Announcements = () => {
   const isDark = theme === 'dark';
 
   const [announcements, setAnnouncements] = useState([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ title: '', description: '', category: 'General', targetAudience: 'All', isPinned: false });
-  const isAdminOrLeader = user?.role === 'Admin' || user?.role === 'Leader' || user?.role === 'admin' || user?.role === 'leader';
+  const userRole = (user?.role || '').toLowerCase();
+  const isAdminOrLeader = userRole === 'admin' || userRole === 'leader';
 
   useEffect(() => {
-    fetchAnnouncements();
+    fetchInitialAnnouncements();
   }, []);
 
-  const fetchAnnouncements = async () => {
+  const fetchInitialAnnouncements = async () => {
     try {
-      const res = await apiClient.get('/announcements');
-      setAnnouncements(Array.isArray(res.data) ? res.data : []);
+      setInitialLoading(true);
+      const res = await apiClient.get('/announcements?page=1&limit=6');
+      if (res.data && Array.isArray(res.data.data)) {
+        setAnnouncements(res.data.data);
+        setHasMore(res.data.hasMore);
+        setPage(1);
+      } else if (Array.isArray(res.data)) {
+        setAnnouncements(res.data);
+        setHasMore(false);
+      }
     } catch (error) {
       console.error('Error fetching announcements:', error);
+    } finally {
+      setInitialLoading(false);
     }
   };
 
+  const loadMoreAnnouncements = async () => {
+    if (loading || !hasMore) return;
+    try {
+      setLoading(true);
+      const nextPage = page + 1;
+      const res = await apiClient.get(`/announcements?page=${nextPage}&limit=6`);
+      if (res.data && Array.isArray(res.data.data)) {
+        setAnnouncements(prev => {
+          const existingIds = new Set(prev.map(a => a._id));
+          const newItems = res.data.data.filter(a => !existingIds.has(a._id));
+          return [...prev, ...newItems];
+        });
+        setHasMore(res.data.hasMore);
+        setPage(nextPage);
+      }
+    } catch (error) {
+      console.error('Error loading more announcements:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 250) {
+        if (hasMore && !loading && !initialLoading) {
+          loadMoreAnnouncements();
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [hasMore, loading, initialLoading, page]);
+
+  const [submitting, setSubmitting] = useState(false);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     try {
+      setSubmitting(true);
       await apiClient.post('/announcements', formData);
       setShowForm(false);
       setFormData({ title: '', description: '', category: 'General', targetAudience: 'All', isPinned: false });
-      fetchAnnouncements();
+      fetchInitialAnnouncements();
     } catch (error) {
       console.error('Error creating announcement:', error);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleDelete = async (id) => {
     try {
       await apiClient.delete(`/announcements/${id}`);
-      fetchAnnouncements();
+      fetchInitialAnnouncements();
     } catch (error) {
       console.error('Error deleting announcement:', error);
     }
@@ -131,7 +186,20 @@ const Announcements = () => {
             />
             <label htmlFor="isPinned" className={`ml-2 block text-sm font-medium cursor-pointer ${isDark ? 'text-gray-300' : 'text-gray-800'}`}>Pin to top</label>
           </div>
-          <button type="submit" className="w-full bg-indigo-600 text-white font-bold p-3 rounded-xl hover:bg-indigo-700 transition">Publish Announcement</button>
+          <button 
+            type="submit" 
+            disabled={submitting} 
+            className="w-full bg-indigo-600 text-white font-bold p-3 rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+          >
+            {submitting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Publishing...
+              </>
+            ) : (
+              'Publish Announcement'
+            )}
+          </button>
         </form>
       )}
 
@@ -176,9 +244,22 @@ const Announcements = () => {
           </div>
         ))}
 
-        {announcements.length === 0 && (
+        {announcements.length === 0 && !initialLoading && (
           <div className={`col-span-full text-center py-12 rounded-2xl border ${isDark ? 'bg-[#14161f] border-gray-800 text-gray-400' : 'bg-white border-gray-200 text-gray-500'}`}>
             No circulars published yet.
+          </div>
+        )}
+
+        {loading && (
+          <div className="col-span-full py-6 flex justify-center items-center gap-2 text-sm text-indigo-500 font-medium">
+            <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+            Loading more announcements...
+          </div>
+        )}
+
+        {!hasMore && announcements.length > 0 && (
+          <div className="col-span-full py-4 text-center text-xs text-gray-500 font-medium">
+            You have reached the end of all announcements.
           </div>
         )}
       </div>

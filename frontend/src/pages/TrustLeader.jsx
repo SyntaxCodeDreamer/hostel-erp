@@ -44,10 +44,15 @@ const TrustLeader = () => {
     }
   };
 
+  const [submittingMember, setSubmittingMember] = useState(false);
+  const [submittingLeader, setSubmittingLeader] = useState(false);
+
   const handleMemberSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
+    if (submittingMember) return;
     try {
+      setSubmittingMember(true);
       const payload = {
         ...memberData,
         joiningDate: memberData.joiningDate || new Date().toISOString().split('T')[0]
@@ -59,13 +64,17 @@ const TrustLeader = () => {
     } catch (error) {
       console.error('Error creating member:', error);
       setErrorMsg(error.message || 'Failed to add trust member');
+    } finally {
+      setSubmittingMember(false);
     }
   };
 
   const handleLeaderSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
+    if (submittingLeader) return;
     try {
+      setSubmittingLeader(true);
       await apiClient.post('/trust/leaders', leaderData);
       setShowForm(false);
       setLeaderData({ name: '', email: '', password: '', role: 'Leader', contactNumber: '', duration: '' });
@@ -73,6 +82,8 @@ const TrustLeader = () => {
     } catch (error) {
       console.error('Error creating leader:', error);
       setErrorMsg(error.message || 'Failed to add leader account');
+    } finally {
+      setSubmittingLeader(false);
     }
   };
 
@@ -180,7 +191,20 @@ const TrustLeader = () => {
                   <input type="date" value={memberData.joiningDate} onChange={(e) => setMemberData({...memberData, joiningDate: e.target.value})} className={`w-full border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'}`} />
                 </div>
               </div>
-              <button type="submit" className="w-full bg-indigo-600 text-white font-bold p-3 rounded-xl hover:bg-indigo-700 transition">Save Trust Member</button>
+              <button 
+                type="submit" 
+                disabled={submittingMember} 
+                className="w-full bg-indigo-600 text-white font-bold p-3 rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+              >
+                {submittingMember ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Saving Member...
+                  </>
+                ) : (
+                  'Save Trust Member'
+                )}
+              </button>
             </form>
           ) : (
             <form onSubmit={handleLeaderSubmit} className="space-y-4">
@@ -210,7 +234,20 @@ const TrustLeader = () => {
                   <input type="text" required value={leaderData.duration} onChange={(e) => setLeaderData({...leaderData, duration: e.target.value})} className={`w-full border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'}`} placeholder="e.g. 2025 - 2026" />
                 </div>
               </div>
-              <button type="submit" className="w-full bg-indigo-600 text-white font-bold p-3 rounded-xl hover:bg-indigo-700 transition">Save Leader Account</button>
+              <button 
+                type="submit" 
+                disabled={submittingLeader} 
+                className="w-full bg-indigo-600 text-white font-bold p-3 rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+              >
+                {submittingLeader ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Saving Leader...
+                  </>
+                ) : (
+                  'Save Leader Account'
+                )}
+              </button>
             </form>
           )}
         </div>

@@ -142,9 +142,16 @@ const Login = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex justify-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-lg disabled:opacity-50 mt-2"
+            className="w-full flex justify-center items-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed mt-2"
           >
-            {loading && !showPermissionModal ? 'Signing In...' : 'Sign In'}
+            {loading && !showPermissionModal ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Signing In...
+              </>
+            ) : (
+              'Sign In'
+            )}
           </button>
         </motion.form>
       </motion.div>

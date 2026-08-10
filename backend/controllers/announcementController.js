@@ -18,6 +18,32 @@ const getAnnouncements = async (req, res) => {
       };
     }
 
+    const { page, limit } = req.query;
+
+    if (page) {
+      const pageNum = parseInt(page, 10) || 1;
+      const limitNum = parseInt(limit, 10) || 6;
+      const skip = (pageNum - 1) * limitNum;
+
+      const totalCount = await Announcement.countDocuments(filterQuery);
+      const announcements = await Announcement.find(filterQuery)
+        .populate('createdBy', 'name role')
+        .sort({ isPinned: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum);
+
+      const totalPages = Math.ceil(totalCount / limitNum) || 1;
+      const hasMore = pageNum < totalPages;
+
+      return res.json({
+        data: announcements,
+        page: pageNum,
+        totalPages,
+        hasMore,
+        totalCount
+      });
+    }
+
     const announcements = await Announcement.find(filterQuery)
       .populate('createdBy', 'name role')
       .sort({ isPinned: -1, createdAt: -1 });

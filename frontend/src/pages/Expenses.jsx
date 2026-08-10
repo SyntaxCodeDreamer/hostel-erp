@@ -39,9 +39,13 @@ const Expenses = () => {
     }
   };
 
+  const [submitting, setSubmitting] = useState(false);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     try {
+      setSubmitting(true);
       await apiClient.post('/expenses', formData);
       setShowForm(false);
       setFormData({ date: '', category: 'Food', description: '', amount: '' });
@@ -49,6 +53,8 @@ const Expenses = () => {
       fetchSummary();
     } catch (error) {
       console.error('Error creating expense:', error);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -141,6 +147,22 @@ const Expenses = () => {
                 className={`w-full border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'}`}
                 placeholder="Invoice details or receipt notes..."
               />
+            </div>
+            <div className="md:col-span-4">
+              <button 
+                type="submit" 
+                disabled={submitting} 
+                className="w-full bg-indigo-600 text-white font-bold p-3 rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+              >
+                {submitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Recording Expense...
+                  </>
+                ) : (
+                  'Record Expense'
+                )}
+              </button>
             </div>
           </div>
         </form>

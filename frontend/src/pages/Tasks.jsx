@@ -10,27 +10,76 @@ const Tasks = () => {
   const isDark = theme === 'dark';
 
   const [tasks, setTasks] = useState([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+
   const [studentsList, setStudentsList] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ title: '', description: '', assignedTo: '', priority: 'Medium', dueDate: '' });
-
-  const isAdminOrLeader = user?.role === 'Admin' || user?.role === 'Leader' || user?.role === 'admin' || user?.role === 'leader';
+  const userRole = (user?.role || '').toLowerCase();
+  const isAdminOrLeader = userRole === 'admin' || userRole === 'leader';
 
   useEffect(() => {
-    fetchTasks();
+    fetchInitialTasks();
     if (isAdminOrLeader) {
       fetchStudentsForAssignment();
     }
   }, [isAdminOrLeader]);
 
-  const fetchTasks = async () => {
+  const fetchInitialTasks = async () => {
     try {
-      const res = await apiClient.get('/tasks');
-      setTasks(Array.isArray(res.data) ? res.data : []);
+      setInitialLoading(true);
+      const res = await apiClient.get('/tasks?page=1&limit=6');
+      if (res.data && Array.isArray(res.data.data)) {
+        setTasks(res.data.data);
+        setHasMore(res.data.hasMore);
+        setPage(1);
+      } else if (Array.isArray(res.data)) {
+        setTasks(res.data);
+        setHasMore(false);
+      }
     } catch (error) {
       console.error('Error fetching tasks:', error);
+    } finally {
+      setInitialLoading(false);
     }
   };
+
+  const loadMoreTasks = async () => {
+    if (loading || !hasMore) return;
+    try {
+      setLoading(true);
+      const nextPage = page + 1;
+      const res = await apiClient.get(`/tasks?page=${nextPage}&limit=6`);
+      if (res.data && Array.isArray(res.data.data)) {
+        setTasks(prev => {
+          const existingIds = new Set(prev.map(t => t._id));
+          const newItems = res.data.data.filter(t => !existingIds.has(t._id));
+          return [...prev, ...newItems];
+        });
+        setHasMore(res.data.hasMore);
+        setPage(nextPage);
+      }
+    } catch (error) {
+      console.error('Error loading more tasks:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 250) {
+        if (hasMore && !loading && !initialLoading) {
+          loadMoreTasks();
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [hasMore, loading, initialLoading, page]);
 
   const fetchStudentsForAssignment = async () => {
     try {
@@ -41,22 +90,28 @@ const Tasks = () => {
     }
   };
 
+  const [submitting, setSubmitting] = useState(false);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     try {
+      setSubmitting(true);
       await apiClient.post('/tasks', formData);
       setShowForm(false);
       setFormData({ title: '', description: '', assignedTo: '', priority: 'Medium', dueDate: '' });
-      fetchTasks();
+      fetchInitialTasks();
     } catch (error) {
       console.error('Error creating task:', error);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const updateStatus = async (id, status) => {
     try {
       await apiClient.put(`/tasks/${id}/status`, { status });
-      fetchTasks();
+      fetchInitialTasks();
     } catch (error) {
       console.error('Error updating task status:', error);
     }
@@ -169,7 +224,20 @@ const Tasks = () => {
               />
             </div>
           </div>
-          <button type="submit" className="w-full bg-indigo-600 text-white font-bold p-3 rounded-xl hover:bg-indigo-700 transition">Create & Assign Task</button>
+          <button 
+            type="submit" 
+            disabled={submitting} 
+            className="w-full bg-indigo-600 text-white font-bold p-3 rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+          >
+            {submitting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Creating Task...
+              </>
+            ) : (
+              'Create & Assign Task'
+            )}
+          </button>
         </form>
       )}
 
@@ -213,9 +281,22 @@ const Tasks = () => {
           </div>
         ))}
 
-        {tasks.length === 0 && (
+        {tasks.length === 0 && !initialLoading && (
           <div className={`col-span-full text-center py-12 rounded-2xl border ${isDark ? 'bg-[#14161f] border-gray-800 text-gray-400' : 'bg-white border-gray-200 text-gray-500'}`}>
             No tasks assigned yet.
+          </div>
+        )}
+
+        {loading && (
+          <div className="col-span-full py-6 flex justify-center items-center gap-2 text-sm text-indigo-500 font-medium">
+            <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+            Loading more tasks...
+          </div>
+        )}
+
+        {!hasMore && tasks.length > 0 && (
+          <div className="col-span-full py-4 text-center text-xs text-gray-500 font-medium">
+            You have reached the end of all tasks.
           </div>
         )}
       </div>

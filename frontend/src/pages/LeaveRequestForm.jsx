@@ -11,6 +11,7 @@ const LeaveRequestForm = () => {
     destination: '',
     emergencyContact: ''
   });
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
   const { theme } = useContext(ThemeContext);
   const isDark = theme === 'dark';
@@ -21,11 +22,15 @@ const LeaveRequestForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     try {
+      setSubmitting(true);
       await apiClient.post('/leaves', formData);
       navigate('/leaves');
     } catch (error) {
       alert(error.message || 'Error creating leave request. (Are you a student?)');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -55,7 +60,20 @@ const LeaveRequestForm = () => {
           <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Reason</label>
           <textarea name="reason" value={formData.reason} onChange={handleChange} required className={`mt-1 block w-full rounded-xl shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2.5 border transition-colors ${isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`} rows="3"></textarea>
         </div>
-        <button type="submit" className="w-full bg-indigo-600 text-white py-2.5 px-4 rounded-xl hover:bg-indigo-700 transition font-medium shadow-sm mt-4">Submit Request</button>
+        <button 
+          type="submit" 
+          disabled={submitting} 
+          className="w-full bg-indigo-600 text-white py-2.5 px-4 rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium shadow-sm mt-4 flex items-center justify-center gap-2"
+        >
+          {submitting ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              Submitting Request...
+            </>
+          ) : (
+            'Submit Request'
+          )}
+        </button>
       </form>
     </div>
   );
