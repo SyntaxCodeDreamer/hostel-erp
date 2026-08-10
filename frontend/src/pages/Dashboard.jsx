@@ -434,11 +434,9 @@ const Dashboard = () => {
 
       </motion.div>
 
-      {/* Row 3: Circulars & Regulations */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* Left 2 Cols: Recent Circulars */}
-        <div className={`lg:col-span-2 border rounded-2xl p-6 shadow-xs space-y-4 transition ${isDark ? 'bg-[#14161f] border-gray-800/80' : 'bg-white border-gray-200'}`}>
+      {/* Row 3: Circulars */}
+      <motion.div variants={itemVariants}>
+        <div className={`border rounded-2xl p-6 shadow-xs space-y-4 transition ${isDark ? 'bg-[#14161f] border-gray-800/80' : 'bg-white border-gray-200'}`}>
           <div className="flex items-center justify-between mb-2">
             <h3 className={`text-base font-bold tracking-wide flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-800'}`}>
               <Megaphone size={18} className="text-indigo-500" /> Recent Circulars
@@ -477,37 +475,6 @@ const Dashboard = () => {
             )}
           </div>
         </div>
-
-        {/* Right 1 Col: Residency Regulations Card */}
-        <motion.div 
-          whileHover={{ scale: 1.02 }}
-          className="bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-800 p-6 rounded-2xl text-white shadow-lg flex flex-col justify-between"
-        >
-          <div>
-            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <BookOpen size={20} /> Residency Regulations
-            </h3>
-            <ul className="space-y-3 text-xs leading-relaxed text-indigo-100">
-              <li className="flex items-start gap-2">
-                <span className="font-bold">•</span>
-                <span><strong>Mess Timings</strong>: 7:30 AM - 9:30 AM, 12:30 PM - 2:00 PM, 7:30 PM - 9:30 PM.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="font-bold">•</span>
-                <span>Out-of-hostel entry requires approval via Leave Tracker.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="font-bold">•</span>
-                <span>Cleanliness is checked weekly. Ensure task logs are updated.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="font-bold">•</span>
-                <span>Any maintenance issues must be immediately flagged to Leaders.</span>
-              </li>
-            </ul>
-          </div>
-        </motion.div>
-
       </motion.div>
 
     </motion.div>
