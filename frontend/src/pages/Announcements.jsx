@@ -124,7 +124,7 @@ const Announcements = () => {
             className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-sm hover:bg-indigo-700 transition flex items-center gap-1.5"
           >
             <Plus size={16} />
-            {showForm ? 'Cancel' : 'Post Circular'}
+            {showForm ? 'Cancel' : 'Post Announcement'}
           </button>
         )}
       </div>
