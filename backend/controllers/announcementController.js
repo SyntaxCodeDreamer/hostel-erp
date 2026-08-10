@@ -12,9 +12,12 @@ const getAnnouncements = async (req, res) => {
     let filterQuery = {};
 
     if (userRole === 'trust member' || userRole === 'trustee') {
-      // Trust members cannot see announcements that are made for students only
+      // Trust members see general announcements OR announcements they created
       filterQuery = {
-        targetAudience: { $nin: ['Students', 'students', 'Student', 'student'] }
+        $or: [
+          { targetAudience: { $nin: ['Students', 'students', 'Student', 'student'] } },
+          { createdBy: req.user._id }
+        ]
       };
     }
 
@@ -127,7 +130,8 @@ const updateAnnouncement = async (req, res) => {
 
     if (announcement) {
       // Check if user is Admin, or if Leader they can only edit their own
-      if (req.user.role === 'Leader' && announcement.createdBy.toString() !== req.user._id.toString()) {
+      const roleLower = (req.user.role || '').toLowerCase();
+      if (roleLower !== 'admin' && announcement.createdBy.toString() !== req.user._id.toString()) {
         return res.status(403).json({ message: 'Not authorized to update this announcement' });
       }
 
@@ -149,13 +153,14 @@ const updateAnnouncement = async (req, res) => {
 
 // @desc    Delete an announcement
 // @route   DELETE /api/announcements/:id
-// @access  Private (Admin/Leader)
+// @access  Private (Admin/Leader/Trust Member)
 const deleteAnnouncement = async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id);
 
     if (announcement) {
-      if (req.user.role === 'Leader' && announcement.createdBy.toString() !== req.user._id.toString()) {
+      const roleLower = (req.user.role || '').toLowerCase();
+      if (roleLower !== 'admin' && announcement.createdBy.toString() !== req.user._id.toString()) {
         return res.status(403).json({ message: 'Not authorized to delete this announcement' });
       }
 

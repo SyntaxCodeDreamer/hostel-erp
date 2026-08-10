@@ -89,6 +89,7 @@ const Announcements = () => {
       fetchInitialAnnouncements();
     } catch (error) {
       console.error('Error creating announcement:', error);
+      alert(error.response?.data?.message || error.message || 'Failed to publish announcement.');
     } finally {
       setSubmitting(false);
     }
@@ -221,7 +222,7 @@ const Announcements = () => {
                   )}
                   {ann.isPinned && <span className="text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 dark:border dark:border-amber-800/40 px-2.5 py-1 rounded-full flex items-center gap-1"><Pin size={12} /> Pinned</span>}
                 </div>
-                {isAdminOrLeader && (user?._id === ann.createdBy?._id || user?.role === 'Admin' || user?.role === 'admin') && (
+                {isAdminOrLeader && ((user?._id || '').toString() === (ann.createdBy?._id || ann.createdBy || '').toString() || userRole === 'admin') && (
                   <button onClick={() => handleDelete(ann._id)} className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition p-1" title="Delete">
                     <Trash2 size={16} />
                   </button>
