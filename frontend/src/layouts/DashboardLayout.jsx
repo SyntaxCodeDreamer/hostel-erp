@@ -202,7 +202,6 @@ const DashboardLayout = () => {
               { path: '/leaves', label: 'Leaves' },
               { path: '/tasks', label: 'Tasks' },
               { path: '/announcements', label: 'Announcements' },
-              { path: '/trust-members', label: 'Trust & Leaders' },
             ].map((item) => (
               <Link 
                 key={item.path}
@@ -233,6 +232,19 @@ const DashboardLayout = () => {
                 Expenses
               </Link>
             )}
+
+            <Link 
+              to="/trust-members" 
+              className={`block py-2.5 px-4 rounded-xl font-medium transition ${
+                location.pathname === '/trust-members' 
+                  ? 'bg-indigo-600 text-white shadow-sm font-semibold' 
+                  : isDark 
+                  ? 'text-gray-400 hover:bg-[#1a1c29] hover:text-white' 
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              Trust & Leaders
+            </Link>
           </nav>
               </div>
             </motion.aside>

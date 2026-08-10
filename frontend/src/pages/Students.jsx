@@ -2,7 +2,7 @@ import React, { useEffect, useState, useContext } from 'react';
 import apiClient from '../utils/apiClient';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { Eye, X, Phone, MapPin, GraduationCap, Edit3, Save, CheckCircle, ExternalLink, Link as LinkIcon, TrendingUp, Plus, Trash2, Award, FileText } from 'lucide-react';
+import { Eye, X, Phone, MapPin, GraduationCap, Edit3, Save, CheckCircle, ExternalLink, Link as LinkIcon, TrendingUp, Plus, Trash2, Award, FileText, Search } from 'lucide-react';
 
 const Students = () => {
   const [students, setStudents] = useState([]);
@@ -14,6 +14,10 @@ const Students = () => {
   const [studentLeaveCount, setStudentLeaveCount] = useState(0);
   const [leavesList, setLeavesList] = useState([]);
   const { user } = useContext(AuthContext);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
 
   const [showProgressForm, setShowProgressForm] = useState(false);
   const [progressError, setProgressError] = useState('');
@@ -272,6 +276,19 @@ const Students = () => {
     const raw = student.status || 'active';
     return raw.charAt(0).toUpperCase() + raw.slice(1);
   };
+
+  const filteredStudents = students.filter((student) => {
+    const name = getStudentName(student).toLowerCase();
+    const email = getStudentEmail(student).toLowerCase();
+    const course = (student.course || '').toLowerCase();
+    const room = (student.roomNumber || '').toLowerCase();
+    const q = searchQuery.toLowerCase().trim();
+    return name.includes(q) || email.includes(q) || course.includes(q) || room.includes(q);
+  });
+
+  const totalPages = Math.ceil(filteredStudents.length / itemsPerPage) || 1;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedStudents = filteredStudents.slice(startIndex, startIndex + itemsPerPage);
 
   return (
     <div className="p-2 sm:p-6">
@@ -742,95 +759,161 @@ const Students = () => {
           </div>
         )
       ) : (
-        /* ADMIN / LEADER DIRECTORY TABLE */
-        <div className="rounded-2xl border border-gray-800/80 bg-[#14161f] overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-800">
-              <thead className="bg-[#1a1c26]">
-                <tr>
-                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Student Info</th>
-                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Course & College</th>
-                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Room</th>
-                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Mobile</th>
-                  <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3.5 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-800/60">
-                {students.map((student) => {
-                  const sName = getStudentName(student);
-                  const sEmail = getStudentEmail(student);
-                  const sStatus = getStudentStatus(student);
-                  const sMobile = student.mobile || student.mobileNumber || 'N/A';
+        /* ADMIN / LEADER / TRUST MEMBER DIRECTORY TABLE */
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3.5 top-3 text-gray-400" size={16} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Search by student name, course, or room..."
+                className="w-full pl-10 pr-4 py-2.5 bg-[#14161f] border border-gray-800 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"
+              />
+            </div>
+            <div className="text-xs text-gray-400 font-semibold">
+              Showing {filteredStudents.length} student{filteredStudents.length !== 1 ? 's' : ''}
+            </div>
+          </div>
 
-                  return (
-                    <tr key={student._id} onClick={() => handleViewProfile(student)} className="hover:bg-gray-800/40 transition cursor-pointer">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="h-10 w-10 flex-shrink-0 rounded-full bg-indigo-900/60 text-indigo-300 border border-indigo-700/50 flex items-center justify-center font-bold text-base">
-                            {sName.charAt(0).toUpperCase()}
+          <div className="rounded-2xl border border-gray-800/80 bg-[#14161f] overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-800">
+                <thead className="bg-[#1a1c26]">
+                  <tr>
+                    <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Student Info</th>
+                    <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Course & College</th>
+                    <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Room</th>
+                    <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Mobile</th>
+                    <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3.5 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800/60">
+                  {paginatedStudents.map((student) => {
+                    const sName = getStudentName(student);
+                    const sEmail = getStudentEmail(student);
+                    const sStatus = getStudentStatus(student);
+                    const sMobile = student.mobile || student.mobileNumber || 'N/A';
+
+                    return (
+                      <tr key={student._id} onClick={() => handleViewProfile(student)} className="hover:bg-gray-800/40 transition cursor-pointer">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="h-10 w-10 flex-shrink-0 rounded-full bg-indigo-900/60 text-indigo-300 border border-indigo-700/50 flex items-center justify-center font-bold text-base">
+                              {sName.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="ml-3">
+                              <div className="text-sm font-semibold text-white">{sName}</div>
+                              <div className="text-xs text-gray-400">{sEmail}</div>
+                            </div>
                           </div>
-                          <div className="ml-3">
-                            <div className="text-sm font-semibold text-white">{sName}</div>
-                            <div className="text-xs text-gray-400">{sEmail}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-200">{student.course || 'N/A'}</div>
-                        <div className="text-xs text-gray-400">{student.collegeName || 'N/A'}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">
-                        {student.roomNumber ? `Room ${student.roomNumber}` : 'Unassigned'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{sMobile}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2.5 py-1 inline-flex text-xs font-semibold rounded-full ${
-                          sStatus === 'Active' 
-                            ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/50' 
-                            : sStatus === 'On Leave' || sStatus === 'On leave'
-                            ? 'bg-amber-950/80 text-amber-400 border border-amber-800/50'
-                            : 'bg-rose-950/80 text-rose-400 border border-rose-800/50'
-                        }`}>
-                          {sStatus}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => handleViewProfile(student)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-950/60 text-indigo-300 border border-indigo-800/50 hover:bg-indigo-900/80 text-xs font-semibold transition"
-                          >
-                            <Eye size={14} />
-                            View Profile
-                          </button>
-                          {!isStudent && (
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-200">{student.course || 'N/A'}</div>
+                          <div className="text-xs text-gray-400">{student.collegeName || 'N/A'}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">
+                          {student.roomNumber ? `Room ${student.roomNumber}` : 'Unassigned'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{sMobile}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2.5 py-1 inline-flex text-xs font-semibold rounded-full ${
+                            sStatus === 'Active' 
+                              ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/50' 
+                              : sStatus === 'On Leave' || sStatus === 'On leave'
+                              ? 'bg-amber-950/80 text-amber-400 border border-amber-800/50'
+                              : 'bg-rose-950/80 text-rose-400 border border-rose-800/50'
+                          }`}>
+                            {sStatus}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                          <div className="flex items-center justify-center gap-2">
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteStudent(student._id);
-                              }}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-950/60 text-rose-300 border border-rose-800/50 hover:bg-rose-900/80 text-xs font-semibold transition"
-                              title="Delete Student"
+                              onClick={() => handleViewProfile(student)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-950/60 text-indigo-300 border border-indigo-800/50 hover:bg-indigo-900/80 text-xs font-semibold transition"
                             >
-                              <Trash2 size={14} />
-                              Delete
+                              <Eye size={14} />
+                              View Profile
                             </button>
-                          )}
-                        </div>
+                            {isAdmin && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteStudent(student._id);
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-950/60 text-rose-300 border border-rose-800/50 hover:bg-rose-900/80 text-xs font-semibold transition"
+                                title="Delete Student"
+                              >
+                                <Trash2 size={14} />
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {filteredStudents.length === 0 && (
+                    <tr>
+                      <td colSpan="6" className="px-6 py-8 text-center text-gray-400">
+                        No student records found.
                       </td>
                     </tr>
-                  );
-                })}
-                {students.length === 0 && (
-                  <tr>
-                    <td colSpan="6" className="px-6 py-8 text-center text-gray-400">
-                      No student records found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls Footer */}
+            {filteredStudents.length > 0 && (
+              <div className="px-6 py-4 border-t border-gray-800 flex flex-wrap items-center justify-between gap-4 text-xs text-gray-400 bg-[#14161f]">
+                <div>
+                  Showing <span className="font-bold text-white">{startIndex + 1}</span> to{' '}
+                  <span className="font-bold text-white">{Math.min(startIndex + itemsPerPage, filteredStudents.length)}</span> of{' '}
+                  <span className="font-bold text-white">{filteredStudents.length}</span> students
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    className="px-3 py-1.5 rounded-lg border border-gray-700 bg-[#1a1c26] text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium"
+                  >
+                    Previous
+                  </button>
+
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                          currentPage === pageNum
+                            ? 'bg-indigo-600 text-white shadow-xs'
+                            : 'border border-gray-700 bg-[#1a1c26] text-gray-300 hover:bg-gray-800'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    className="px-3 py-1.5 rounded-lg border border-gray-700 bg-[#1a1c26] text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
