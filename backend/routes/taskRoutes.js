@@ -9,7 +9,7 @@ const { protect, authorize } = require('../middleware/authMiddleware');
 
 router.route('/')
   .get(protect, getTasks)
-  .post(protect, authorize('Admin', 'Leader'), createTask);
+  .post(protect, authorize('Admin', 'Leader', 'Trust Member', 'Trustee'), createTask);
 
 router.route('/:id/status')
   .put(protect, updateTaskStatus);

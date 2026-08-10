@@ -18,7 +18,7 @@ const Tasks = () => {
   const [studentsList, setStudentsList] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const userRole = (user?.role || '').toLowerCase();
-  const isAdminOrLeader = userRole === 'admin' || userRole === 'leader';
+  const isAdminOrLeader = ['admin', 'leader', 'trust member', 'trustee'].includes(userRole);
 
   useEffect(() => {
     fetchInitialTasks();
