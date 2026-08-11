@@ -70,16 +70,32 @@ const Tasks = () => {
   };
 
   useEffect(() => {
+    const mainEl = document.querySelector('main');
+
     const handleScroll = () => {
-      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 250) {
-        if (hasMore && !loading && !initialLoading) {
-          loadMoreTasks();
+      if (mainEl) {
+        const { scrollTop, clientHeight, scrollHeight } = mainEl;
+        if (scrollTop + clientHeight >= scrollHeight - 250) {
+          if (hasMore && !loading && !initialLoading) {
+            loadMoreTasks();
+          }
+        }
+      } else {
+        if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 250) {
+          if (hasMore && !loading && !initialLoading) {
+            loadMoreTasks();
+          }
         }
       }
     };
 
+    if (mainEl) mainEl.addEventListener('scroll', handleScroll);
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+
+    return () => {
+      if (mainEl) mainEl.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('scroll', handleScroll);
+    };
   }, [hasMore, loading, initialLoading, page]);
 
   const fetchStudentsForAssignment = async () => {
@@ -285,6 +301,17 @@ const Tasks = () => {
         {tasks.length === 0 && !initialLoading && (
           <div className={`col-span-full text-center py-12 rounded-2xl border ${isDark ? 'bg-[#14161f] border-gray-800 text-gray-400' : 'bg-white border-gray-200 text-gray-500'}`}>
             No tasks assigned yet.
+          </div>
+        )}
+
+        {hasMore && !loading && (
+          <div className="col-span-full flex justify-center pt-2 pb-4">
+            <button
+              onClick={loadMoreTasks}
+              className="px-6 py-2.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 rounded-xl text-xs font-bold transition shadow-sm"
+            >
+              Load Older Tasks
+            </button>
           </div>
         )}
 
