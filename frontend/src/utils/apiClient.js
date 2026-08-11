@@ -36,9 +36,9 @@ export const getUploadUrl = (path) => {
  */
 export const getSocketUrl = () => {
   if (rawEnvUrl) {
-    return rawEnvUrl.replace(/\/api$/, '');
+    return rawEnvUrl.replace(/\/api\/?$/, '');
   }
-  return window.location.origin;
+  return 'http://localhost:5000';
 };
 
 // Create Axios Instance with dynamic Base URL
