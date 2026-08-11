@@ -331,7 +331,7 @@ const Dashboard = () => {
       </motion.div>
       )}
 
-      {/* Student Progress Report Flowchart & Category Chart */}
+      {/* Category Chart & Recent Circulars Grid */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* Left 1 Col: Progress Report Category Breakdown Chart */}
@@ -354,8 +354,52 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Right 2 Cols: Student Progress Report Interactive Flowchart / Timeline */}
+        {/* Right 2 Cols: Recent Circulars */}
         <div className={`lg:col-span-2 border rounded-2xl p-6 shadow-xs space-y-4 transition ${isDark ? 'bg-[#14161f] border-gray-800/80' : 'bg-white border-gray-200'}`}>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className={`text-base font-bold tracking-wide flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-800'}`}>
+              <Megaphone size={18} className="text-indigo-500" /> Recent Circulars
+            </h3>
+          </div>
+          <div className="space-y-3">
+            {announcements.slice(0, 3).map((item, i) => (
+              <motion.div 
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.1 }}
+                key={item._id} 
+                className={`border p-4 rounded-xl flex items-center justify-between transition hover:shadow-md ${isDark ? 'bg-[#1a1c26] border-gray-800' : 'bg-gray-50 border-gray-200'}`}
+              >
+                <div>
+                  <h4 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{item.title}</h4>
+                  <p className={`text-xs mt-1 line-clamp-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{item.description || item.content}</p>
+                  <p className="text-[11px] text-gray-500 mt-2">Posted by <span className="text-indigo-600 font-semibold">{item.createdBy?.name || item.createdBy?.email || 'Admin'}</span></p>
+                </div>
+                <span className="text-xs text-gray-400 whitespace-nowrap ml-4">
+                  {new Date(item.createdAt || Date.now()).toLocaleDateString()}
+                </span>
+              </motion.div>
+            ))}
+            {announcements.length === 0 && (
+              <div className="space-y-2">
+                <div className={`border p-3 rounded-xl flex justify-between items-center text-xs ${isDark ? 'bg-[#1a1c26] border-gray-800 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-700'}`}>
+                  <span>Annual Hostel General Meetup</span>
+                  <span className="text-gray-500">Posted by admin@hostel.com</span>
+                </div>
+                <div className={`border p-3 rounded-xl flex justify-between items-center text-xs ${isDark ? 'bg-[#1a1c26] border-gray-800 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-700'}`}>
+                  <span>Water Supply Maintenance Schedule</span>
+                  <span className="text-gray-500">Posted by leader@hostel.com</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+      </motion.div>
+
+      {/* Student Progress Report Flowchart */}
+      <motion.div variants={itemVariants}>
+        <div className={`border rounded-2xl p-6 shadow-xs space-y-4 transition ${isDark ? 'bg-[#14161f] border-gray-800/80' : 'bg-white border-gray-200'}`}>
           <div className="flex items-center justify-between mb-2">
             <h3 className={`text-base font-bold tracking-wide flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-800'}`}>
               <Layers size={18} className="text-indigo-500" /> Student Progress Report Flowchart
@@ -430,50 +474,6 @@ const Dashboard = () => {
               })}
             </div>
           )}
-        </div>
-
-      </motion.div>
-
-      {/* Row 3: Circulars */}
-      <motion.div variants={itemVariants}>
-        <div className={`border rounded-2xl p-6 shadow-xs space-y-4 transition ${isDark ? 'bg-[#14161f] border-gray-800/80' : 'bg-white border-gray-200'}`}>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className={`text-base font-bold tracking-wide flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-800'}`}>
-              <Megaphone size={18} className="text-indigo-500" /> Recent Circulars
-            </h3>
-          </div>
-          <div className="space-y-3">
-            {announcements.slice(0, 3).map((item, i) => (
-              <motion.div 
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.1 }}
-                key={item._id} 
-                className={`border p-4 rounded-xl flex items-center justify-between transition hover:shadow-md ${isDark ? 'bg-[#1a1c26] border-gray-800' : 'bg-gray-50 border-gray-200'}`}
-              >
-                <div>
-                  <h4 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{item.title}</h4>
-                  <p className={`text-xs mt-1 line-clamp-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{item.description || item.content}</p>
-                  <p className="text-[11px] text-gray-500 mt-2">Posted by <span className="text-indigo-600 font-semibold">{item.createdBy?.name || item.createdBy?.email || 'Admin'}</span></p>
-                </div>
-                <span className="text-xs text-gray-400 whitespace-nowrap ml-4">
-                  {new Date(item.createdAt || Date.now()).toLocaleDateString()}
-                </span>
-              </motion.div>
-            ))}
-            {announcements.length === 0 && (
-              <div className="space-y-2">
-                <div className={`border p-3 rounded-xl flex justify-between items-center text-xs ${isDark ? 'bg-[#1a1c26] border-gray-800 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-700'}`}>
-                  <span>Annual Hostel General Meetup</span>
-                  <span className="text-gray-500">Posted by admin@hostel.com</span>
-                </div>
-                <div className={`border p-3 rounded-xl flex justify-between items-center text-xs ${isDark ? 'bg-[#1a1c26] border-gray-800 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-700'}`}>
-                  <span>Water Supply Maintenance Schedule</span>
-                  <span className="text-gray-500">Posted by leader@hostel.com</span>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </motion.div>
 
