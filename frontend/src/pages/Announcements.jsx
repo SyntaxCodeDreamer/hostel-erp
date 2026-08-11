@@ -190,7 +190,9 @@ const Announcements = () => {
                 className={`w-full border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'}`}
               >
                 <option value="All">Send to All (Admins, Leaders & Students)</option>
-                <option value="Students">Only Send Notification to Students</option>
+                {!(userRole === 'trust member' || userRole === 'trustee') && (
+                  <option value="Students">Only Send Notification to Students</option>
+                )}
               </select>
             </div>
           </div>

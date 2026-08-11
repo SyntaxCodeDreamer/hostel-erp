@@ -63,7 +63,11 @@ const createAnnouncement = async (req, res) => {
   const { title, description, category, isPinned, targetAudience } = req.body;
 
   try {
-    const targetAud = (targetAudience || 'All').toString().trim();
+    const userRole = (req.user.role || '').toLowerCase();
+    let targetAud = (targetAudience || 'All').toString().trim();
+    if (userRole === 'trust member' || userRole === 'trustee') {
+      targetAud = 'All';
+    }
 
     const announcement = new Announcement({
       title,
