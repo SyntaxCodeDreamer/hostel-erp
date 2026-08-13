@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import apiClient from '../utils/apiClient';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
-import { Plus, Clock, User as UserIcon } from 'lucide-react';
+import { Plus, Clock, User as UserIcon, AlertTriangle } from 'lucide-react';
 
 const Tasks = () => {
   const { user } = useContext(AuthContext);
@@ -134,6 +134,18 @@ const Tasks = () => {
     }
   };
 
+  const isTaskOverdue = (task) => {
+    if (!task || !task.dueDate) return false;
+    const isCompleted = (task.status || '').toLowerCase() === 'completed';
+    if (isCompleted) return false;
+
+    const due = new Date(task.dueDate);
+    if (isNaN(due.getTime())) return false;
+
+    due.setHours(23, 59, 59, 999);
+    return due < new Date();
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return 'N/A';
     const d = new Date(dateStr);
@@ -259,44 +271,72 @@ const Tasks = () => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {tasks.map((task) => (
-          <div key={task._id} className={`p-5 rounded-2xl border flex flex-col justify-between shadow-sm transition ${isDark ? 'bg-[#14161f] border-gray-800' : 'bg-white border-gray-200'}`}>
-            <div>
-              <div className="flex justify-between items-center mb-3">
-                <span className={`text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${getPriorityBadge(task.priority)}`}>
-                  {task.priority || 'Medium'}
-                </span>
-                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${getStatusBadge(task.status)}`}>
-                  {task.status || 'Pending'}
-                </span>
-              </div>
+        {tasks.map((task) => {
+          const overdue = isTaskOverdue(task);
 
-              <h3 className={`text-base font-bold tracking-wide ${isDark ? 'text-white' : 'text-gray-900'}`}>{task.title || 'Untitled Task'}</h3>
-              <p className={`text-xs mt-2 leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{task.description || 'No description provided.'}</p>
+          return (
+            <div 
+              key={task._id} 
+              className={`p-5 rounded-2xl border flex flex-col justify-between shadow-sm transition relative overflow-hidden ${
+                overdue
+                  ? isDark 
+                    ? 'bg-[#221217] border-rose-600/80 shadow-rose-950/40 ring-1 ring-rose-500/40' 
+                    : 'bg-rose-50/90 border-rose-300 shadow-rose-100 ring-1 ring-rose-200'
+                  : isDark 
+                    ? 'bg-[#14161f] border-gray-800' 
+                    : 'bg-white border-gray-200'
+              }`}
+            >
+              {/* Overdue Top Accent Bar */}
+              {overdue && (
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 via-red-600 to-rose-500"></div>
+              )}
+
+              <div>
+                <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${getPriorityBadge(task.priority)}`}>
+                    {task.priority || 'Medium'}
+                  </span>
+                  
+                  <div className="flex items-center gap-1.5">
+                    {overdue && (
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-600 text-white flex items-center gap-1 uppercase tracking-wider shadow-sm animate-pulse">
+                        <AlertTriangle size={12} /> Overdue
+                      </span>
+                    )}
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${getStatusBadge(task.status)}`}>
+                      {task.status || 'Pending'}
+                    </span>
+                  </div>
+                </div>
+
+                <h3 className={`text-base font-bold tracking-wide ${isDark ? 'text-white' : 'text-gray-900'}`}>{task.title || 'Untitled Task'}</h3>
+                <p className={`text-xs mt-2 leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{task.description || 'No description provided.'}</p>
+                
+                <div className={`mt-4 pt-3 border-t space-y-1.5 text-xs ${isDark ? 'border-gray-800/60 text-gray-400' : 'border-gray-100 text-gray-600'}`}>
+                  <p className="flex items-center gap-1.5">
+                    <UserIcon size={14} className="text-indigo-600 dark:text-indigo-400" />
+                    <span>Assigned To: <strong className={isDark ? 'text-gray-200' : 'text-gray-900'}>{getAssigneeName(task)}</strong></span>
+                  </p>
+                  <p className="flex items-center gap-1.5">
+                    <Clock size={14} className={overdue ? "text-rose-500 font-bold" : "text-amber-600 dark:text-amber-400"} />
+                    <span>Due: <strong className={overdue ? "text-rose-600 dark:text-rose-400 font-bold" : (isDark ? 'text-gray-200' : 'text-gray-900')}>{formatDate(task.dueDate)} {overdue ? '(Expired)' : ''}</strong></span>
+                  </p>
+                </div>
+              </div>
               
-              <div className={`mt-4 pt-3 border-t space-y-1.5 text-xs ${isDark ? 'border-gray-800/60 text-gray-400' : 'border-gray-100 text-gray-600'}`}>
-                <p className="flex items-center gap-1.5">
-                  <UserIcon size={14} className="text-indigo-600 dark:text-indigo-400" />
-                  <span>Assigned To: <strong className={isDark ? 'text-gray-200' : 'text-gray-900'}>{getAssigneeName(task)}</strong></span>
-                </p>
-                <p className="flex items-center gap-1.5">
-                  <Clock size={14} className="text-amber-600 dark:text-amber-400" />
-                  <span>Due: <strong className={isDark ? 'text-gray-200' : 'text-gray-900'}>{formatDate(task.dueDate)}</strong></span>
-                </p>
-              </div>
+              {/* Status Update Actions */}
+              {(isAdminOrLeader || user?._id === task.assignedTo?._id || user?._id === task.assignedTo) && (task.status || '').toLowerCase() !== 'completed' && (
+                <div className={`mt-4 flex gap-2 pt-3 border-t ${isDark ? 'border-gray-800/60' : 'border-gray-100'}`}>
+                  {(task.status || '').toLowerCase() === 'pending' && (
+                    <button onClick={() => updateStatus(task._id, 'In Progress')} className="flex-1 bg-blue-600 text-white dark:bg-blue-950/80 dark:text-blue-300 dark:border dark:border-blue-800/50 text-xs py-1.5 font-semibold rounded-lg hover:bg-blue-700 transition">Start</button>
+                  )}
+                  <button onClick={() => updateStatus(task._id, 'Completed')} className="flex-1 bg-emerald-600 text-white dark:bg-emerald-950/80 dark:text-emerald-300 dark:border dark:border-emerald-800/50 text-xs py-1.5 font-semibold rounded-lg hover:bg-emerald-700 transition">Complete</button>
+                </div>
+              )}
             </div>
-            
-            {/* Status Update Actions */}
-            {(isAdminOrLeader || user?._id === task.assignedTo?._id || user?._id === task.assignedTo) && (task.status || '').toLowerCase() !== 'completed' && (
-              <div className={`mt-4 flex gap-2 pt-3 border-t ${isDark ? 'border-gray-800/60' : 'border-gray-100'}`}>
-                {(task.status || '').toLowerCase() === 'pending' && (
-                  <button onClick={() => updateStatus(task._id, 'In Progress')} className="flex-1 bg-blue-600 text-white dark:bg-blue-950/80 dark:text-blue-300 dark:border dark:border-blue-800/50 text-xs py-1.5 font-semibold rounded-lg hover:bg-blue-700 transition">Start</button>
-                )}
-                <button onClick={() => updateStatus(task._id, 'Completed')} className="flex-1 bg-emerald-600 text-white dark:bg-emerald-950/80 dark:text-emerald-300 dark:border dark:border-emerald-800/50 text-xs py-1.5 font-semibold rounded-lg hover:bg-emerald-700 transition">Complete</button>
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
 
         {tasks.length === 0 && !initialLoading && (
           <div className={`col-span-full text-center py-12 rounded-2xl border ${isDark ? 'bg-[#14161f] border-gray-800 text-gray-400' : 'bg-white border-gray-200 text-gray-500'}`}>

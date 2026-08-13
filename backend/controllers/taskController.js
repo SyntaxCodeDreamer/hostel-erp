@@ -1,11 +1,71 @@
-const Task = require('../models/Task');
-const Notification = require('../models/Notification');
+const User = require('../models/User');
+const { sendPushNotification } = require('../utils/webPush');
+
+// Helper to check for overdue tasks and send alerts to Admins & Leaders
+const checkAndNotifyOverdueTasks = async (req) => {
+  try {
+    const now = new Date();
+    const overdueTasks = await Task.find({
+      status: { $ne: 'Completed' },
+      dueDate: { $lt: now },
+      overdueNotified: { $ne: true }
+    }).populate('assignedTo', 'name fullName email');
+
+    if (overdueTasks.length === 0) return;
+
+    const adminLeaderUsers = await User.find({
+      role: { $in: ['Admin', 'admin', 'Leader', 'leader'] },
+      isActive: { $ne: false }
+    });
+
+    if (adminLeaderUsers.length === 0) return;
+
+    const adminLeaderIds = adminLeaderUsers.map(u => u._id);
+
+    for (const task of overdueTasks) {
+      task.overdueNotified = true;
+      await task.save();
+
+      const assigneeName = task.assignedTo?.fullName || task.assignedTo?.name || task.assignedTo?.email || 'Student Resident';
+      const notifTitle = '🚨 Overdue Task Alert';
+      const notifMsg = `Task "${task.title}" assigned to ${assigneeName} is overdue and not completed yet!`;
+
+      for (const recipient of adminLeaderUsers) {
+        const notif = new Notification({
+          userId: recipient._id,
+          title: notifTitle,
+          message: notifMsg,
+          type: 'Task'
+        });
+        await notif.save();
+
+        if (req?.app?.locals?.connectedUsers) {
+          const socketId = req.app.locals.connectedUsers.get(recipient._id.toString());
+          if (socketId && req?.app?.locals?.io) {
+            req.app.locals.io.to(socketId).emit('new_notification', notif);
+          }
+        }
+      }
+
+      sendPushNotification(adminLeaderIds, {
+        title: notifTitle,
+        body: notifMsg,
+        url: '/tasks'
+      }).catch(err => console.error('Push error for overdue task:', err.message));
+    }
+  } catch (err) {
+    console.error('Error checking overdue tasks:', err.message);
+  }
+};
 
 // @desc    Get all tasks (filtered by ownership for Students)
 // @route   GET /api/tasks
 // @access  Private
 const getTasks = async (req, res) => {
   try {
+    // Check and trigger overdue notifications for Admins & Leaders
+    await checkAndNotifyOverdueTasks(req);
+
     let query = {};
     const userRole = (req.user.role || '').toLowerCase();
     
