@@ -178,10 +178,10 @@ const Dashboard = () => {
           </div>
         </motion.div>
 
-        {/* Stat 3: Pending Chores */}
+        {/* Stat 3: Pending Tasks */}
         <motion.div whileHover={{ y: -5 }} className={`border rounded-2xl p-5 flex items-center justify-between shadow-xs transition-shadow hover:shadow-md ${isDark ? 'bg-[#14161f] border-gray-800/80' : 'bg-white border-gray-200'}`}>
           <div>
-            <p className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{isAdminOrLeader ? 'Pending Chores' : 'My Pending Chores'}</p>
+            <p className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{isAdminOrLeader ? 'Pending Tasks' : 'My Pending Tasks'}</p>
             <h2 className={`text-3xl font-extrabold mt-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>{pendingChoresCount}</h2>
             <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">Assigned duties in progress</p>
           </div>
@@ -190,10 +190,10 @@ const Dashboard = () => {
           </div>
         </motion.div>
 
-        {/* Stat 4: Total Ledgers / Expenses (or Approved Leave Days for Student) */}
+        {/* Stat 4: Total Expenses (or Approved Leave Days for Student) */}
         <motion.div whileHover={{ y: -5 }} className={`border rounded-2xl p-5 flex items-center justify-between shadow-xs transition-shadow hover:shadow-md ${isDark ? 'bg-[#14161f] border-gray-800/80' : 'bg-white border-gray-200'}`}>
           <div>
-            <p className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{isAdminOrLeader ? 'Total Ledgers' : 'Approved Leave Days'}</p>
+            <p className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{isAdminOrLeader ? 'Total Expenses' : 'Approved Leave Days'}</p>
             <h2 className={`text-3xl font-extrabold mt-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>{isAdminOrLeader ? `₹${monthlyExpenseVal}` : (d.totalLeaveDays !== undefined ? d.totalLeaveDays : monthlyExpenseVal)}</h2>
             <p className="text-[11px] text-indigo-500 font-semibold mt-1">
               {isAdminOrLeader ? 'Current total registered' : 'Total number of days'}
@@ -272,10 +272,10 @@ const Dashboard = () => {
       {isAdminOrLeader && (
         <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* Chart 3: Chore Status breakdown */}
+        {/* Chart 3: Task Status Breakdown */}
         <div className={`border rounded-2xl p-6 shadow-xs flex flex-col justify-between transition hover:shadow-md ${isDark ? 'bg-[#14161f] border-gray-800/80' : 'bg-white border-gray-200'}`}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className={`text-base font-bold tracking-wide ${isDark ? 'text-white' : 'text-gray-800'}`}>Chore Status breakdown</h3>
+            <h3 className={`text-base font-bold tracking-wide ${isDark ? 'text-white' : 'text-gray-800'}`}>Task Status Breakdown</h3>
             <CheckSquare size={18} className="text-emerald-500" />
           </div>
           <div style={{ width: '100%', height: 220, minHeight: 220 }} className="relative flex items-center justify-center">
@@ -352,11 +352,11 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Right 2 Cols: Recent Circulars */}
+        {/* Right 2 Cols: Recent Announcements */}
         <div className={`lg:col-span-2 border rounded-2xl p-6 shadow-xs space-y-4 transition ${isDark ? 'bg-[#14161f] border-gray-800/80' : 'bg-white border-gray-200'}`}>
           <div className="flex items-center justify-between mb-2">
             <h3 className={`text-base font-bold tracking-wide flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-800'}`}>
-              <Megaphone size={18} className="text-indigo-500" /> Recent Circulars
+              <Megaphone size={18} className="text-indigo-500" /> Recent Announcements
             </h3>
           </div>
           <div className="space-y-3">
