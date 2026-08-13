@@ -152,19 +152,21 @@ const Dashboard = () => {
         </div>
       </motion.div>
 
-      {/* 4 Stat Overview Cards */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      {/* Stat Overview Cards */}
+      <motion.div variants={itemVariants} className={`grid grid-cols-1 sm:grid-cols-2 ${isAdminOrLeader ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-5`}>
         
-        {/* Stat 1: Total Residents */}
-        <motion.div whileHover={{ y: -5 }} className={`border rounded-2xl p-5 flex items-center justify-between shadow-xs transition-shadow hover:shadow-md ${isDark ? 'bg-[#14161f] border-gray-800/80' : 'bg-white border-gray-200'}`}>
-          <div>
-            <p className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Total Residents</p>
-            <h2 className={`text-3xl font-extrabold mt-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>{totalResidentsCount}</h2>
-          </div>
-          <div className="p-3.5 bg-purple-100 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800/30 text-purple-600 dark:text-purple-400 rounded-xl">
-            <Users size={22} />
-          </div>
-        </motion.div>
+        {/* Stat 1: Total Residents (Admin / Leader / Trust Member only) */}
+        {isAdminOrLeader && (
+          <motion.div whileHover={{ y: -5 }} className={`border rounded-2xl p-5 flex items-center justify-between shadow-xs transition-shadow hover:shadow-md ${isDark ? 'bg-[#14161f] border-gray-800/80' : 'bg-white border-gray-200'}`}>
+            <div>
+              <p className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Total Residents</p>
+              <h2 className={`text-3xl font-extrabold mt-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>{totalResidentsCount}</h2>
+            </div>
+            <div className="p-3.5 bg-purple-100 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800/30 text-purple-600 dark:text-purple-400 rounded-xl">
+              <Users size={22} />
+            </div>
+          </motion.div>
+        )}
 
         {/* Stat 2: Pending Leaves */}
         <motion.div whileHover={{ y: -5 }} className={`border rounded-2xl p-5 flex items-center justify-between shadow-xs transition-shadow hover:shadow-md ${isDark ? 'bg-[#14161f] border-gray-800/80' : 'bg-white border-gray-200'}`}>

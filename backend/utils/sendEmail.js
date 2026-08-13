@@ -62,8 +62,8 @@ const sendWelcomeEmail = async ({ name, email, role, password }) => {
               <tr>
                 <td style="padding: 6px 0; font-weight: 700; width: 160px; color: #475569;">Portal URL:</td>
                 <td style="padding: 6px 0;">
-                  <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" target="_blank" style="color: #4f46e5; font-weight: 600; text-decoration: none;">
-                    ${process.env.FRONTEND_URL || 'http://localhost:5173'}
+                  <a href="${process.env.FRONTEND_URL || 'https://hostel-erp-1.onrender.com'}" target="_blank" style="color: #4f46e5; font-weight: 600; text-decoration: none;">
+                    ${process.env.FRONTEND_URL || 'https://hostel-erp-1.onrender.com'}
                   </a>
                 </td>
               </tr>
