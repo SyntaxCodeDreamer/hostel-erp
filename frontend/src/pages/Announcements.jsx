@@ -277,7 +277,11 @@ const Announcements = () => {
 
         {loading && (
           <div className="col-span-full py-6 flex flex-col items-center justify-center gap-2">
-            <div className="glowing-arc-spinner"></div>
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-md shadow-indigo-500/50 animate-bounce [animation-delay:-0.3s]"></div>
+              <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-md shadow-indigo-500/50 animate-bounce [animation-delay:-0.15s]"></div>
+              <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-md shadow-indigo-500/50 animate-bounce"></div>
+            </div>
             <span className="text-xs text-indigo-400 font-semibold tracking-wider animate-pulse">Loading more announcements...</span>
           </div>
         )}
