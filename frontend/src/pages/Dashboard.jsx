@@ -106,15 +106,15 @@ const Dashboard = () => {
 
   const coursePieData = (d.studentsByCourse && d.studentsByCourse.length > 0)
     ? d.studentsByCourse.map((c) => ({ name: c._id || 'Course', value: c.count || 0 }))
-    : [{ name: 'B.Tech Computer Science', value: 2 }, { name: 'MCA Applications', value: 1 }];
+    : [];
 
   const choreData = (d.taskStatusBreakdown && d.taskStatusBreakdown.length > 0)
     ? d.taskStatusBreakdown.map((t) => ({ name: t._id === 'Pending' || t._id === 'pending' ? 'Pending' : t._id === 'In Progress' || t._id === 'in_progress' ? 'In Progress' : 'Completed', value: t.count || 0 }))
-    : [{ name: 'Pending', value: d.pendingTasks || 0 }, { name: 'In Progress', value: 0 }];
+    : [];
 
   const expenseData = (d.expensesByCategory && d.expensesByCategory.length > 0)
     ? d.expensesByCategory.map((e) => ({ category: e._id || 'Misc', amount: e.totalAmount || 0 }))
-    : [{ category: 'Milk', amount: 450 }, { category: 'Electricity', amount: 980 }, { category: 'Vegetables', amount: 180 }, { category: 'Maintenance', amount: 75 }];
+    : [];
 
   const progressChartData = (d.progressByCategory && d.progressByCategory.length > 0)
     ? d.progressByCategory.map((p) => ({ name: p._id || 'Other', count: p.count || 0 }))
@@ -235,35 +235,43 @@ const Dashboard = () => {
             <h3 className={`text-base font-bold tracking-wide ${isDark ? 'text-white' : 'text-gray-800'}`}>Course Enrollments</h3>
             <Activity size={18} className="text-emerald-500" />
           </div>
-          <div style={{ width: '100%', height: 220, minHeight: 220 }} className="relative flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={coursePieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={6}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {coursePieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COURSE_COLORS[index % COURSE_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ backgroundColor: isDark ? '#1a1c26' : '#ffffff', borderColor: isDark ? '#374151' : '#e2e8f0', borderRadius: '12px', color: isDark ? '#ffffff' : '#0f172a' }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex flex-wrap justify-center gap-4 mt-2">
-            {coursePieData.map((item, index) => (
-              <div key={item.name} className={`flex items-center gap-2 text-xs font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: COURSE_COLORS[index % COURSE_COLORS.length] }}></span>
-                <span>{item.name}</span>
+          {coursePieData.length === 0 ? (
+            <div className={`py-16 text-center text-xs font-medium border border-dashed rounded-xl ${isDark ? 'border-gray-800 text-gray-400' : 'border-gray-300 text-gray-500'}`}>
+              No student course enrollment data available.
+            </div>
+          ) : (
+            <>
+              <div style={{ width: '100%', height: 220, minHeight: 220 }} className="relative flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={coursePieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={6}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {coursePieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COURSE_COLORS[index % COURSE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ backgroundColor: isDark ? '#1a1c26' : '#ffffff', borderColor: isDark ? '#374151' : '#e2e8f0', borderRadius: '12px', color: isDark ? '#ffffff' : '#0f172a' }} />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-            ))}
-          </div>
+              <div className="flex flex-wrap justify-center gap-4 mt-2">
+                {coursePieData.map((item, index) => (
+                  <div key={item.name} className={`flex items-center gap-2 text-xs font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                    <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: COURSE_COLORS[index % COURSE_COLORS.length] }}></span>
+                    <span>{item.name}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </motion.div>
       )}
@@ -278,34 +286,42 @@ const Dashboard = () => {
             <h3 className={`text-base font-bold tracking-wide ${isDark ? 'text-white' : 'text-gray-800'}`}>Task Status Breakdown</h3>
             <CheckSquare size={18} className="text-emerald-500" />
           </div>
-          <div style={{ width: '100%', height: 220, minHeight: 220 }} className="relative flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={choreData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={75}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {choreData.map((entry) => (
-                    <Cell key={entry.name} fill={CHORE_COLORS[entry.name] || '#3b82f6'} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ backgroundColor: isDark ? '#1a1c26' : '#ffffff', borderColor: isDark ? '#374151' : '#e2e8f0', borderRadius: '12px', color: isDark ? '#ffffff' : '#0f172a' }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex justify-center gap-6 mt-2">
-            {choreData.map((item) => (
-              <div key={item.name} className={`flex items-center gap-2 text-xs font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                <span className="w-3 h-3 rounded-xs inline-block" style={{ backgroundColor: CHORE_COLORS[item.name] || '#3b82f6' }}></span>
-                <span>{item.name} ({item.value})</span>
+          {choreData.length === 0 ? (
+            <div className={`py-16 text-center text-xs font-medium border border-dashed rounded-xl ${isDark ? 'border-gray-800 text-gray-400' : 'border-gray-300 text-gray-500'}`}>
+              No task records assigned yet.
+            </div>
+          ) : (
+            <>
+              <div style={{ width: '100%', height: 220, minHeight: 220 }} className="relative flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={choreData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={75}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {choreData.map((entry) => (
+                        <Cell key={entry.name} fill={CHORE_COLORS[entry.name] || '#3b82f6'} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ backgroundColor: isDark ? '#1a1c26' : '#ffffff', borderColor: isDark ? '#374151' : '#e2e8f0', borderRadius: '12px', color: isDark ? '#ffffff' : '#0f172a' }} />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-            ))}
-          </div>
+              <div className="flex justify-center gap-6 mt-2">
+                {choreData.map((item) => (
+                  <div key={item.name} className={`flex items-center gap-2 text-xs font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                    <span className="w-3 h-3 rounded-xs inline-block" style={{ backgroundColor: CHORE_COLORS[item.name] || '#3b82f6' }}></span>
+                    <span>{item.name} ({item.value})</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Chart 4: Expense breakdown by Category */}
@@ -314,17 +330,23 @@ const Dashboard = () => {
             <h3 className={`text-base font-bold tracking-wide ${isDark ? 'text-white' : 'text-gray-800'}`}>Expense breakdown by Category</h3>
             <Wallet size={18} className="text-rose-500" />
           </div>
-          <div style={{ width: '100%', height: 260, minHeight: 260 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={expenseData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={isDark ? "#27293d" : "#f1f5f9"} />
-                <XAxis type="number" stroke={isDark ? "#9ca3af" : "#64748b"} fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis type="category" dataKey="category" stroke={isDark ? "#9ca3af" : "#64748b"} fontSize={12} tickLine={false} axisLine={false} width={90} />
-                <Tooltip cursor={{ fill: isDark ? '#1f212e' : '#f8fafc' }} contentStyle={{ backgroundColor: isDark ? '#1a1c26' : '#ffffff', borderColor: isDark ? '#374151' : '#e2e8f0', borderRadius: '12px', color: isDark ? '#ffffff' : '#0f172a' }} />
-                <Bar dataKey="amount" fill="#ff4d6d" radius={[0, 6, 6, 0]} barSize={22} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          {expenseData.length === 0 ? (
+            <div className={`py-16 text-center text-xs font-medium border border-dashed rounded-xl ${isDark ? 'border-gray-800 text-gray-400' : 'border-gray-300 text-gray-500'}`}>
+              No expense records registered yet.
+            </div>
+          ) : (
+            <div style={{ width: '100%', height: 260, minHeight: 260 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={expenseData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={isDark ? "#27293d" : "#f1f5f9"} />
+                  <XAxis type="number" stroke={isDark ? "#9ca3af" : "#64748b"} fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis type="category" dataKey="category" stroke={isDark ? "#9ca3af" : "#64748b"} fontSize={12} tickLine={false} axisLine={false} width={90} />
+                  <Tooltip cursor={{ fill: isDark ? '#1f212e' : '#f8fafc' }} contentStyle={{ backgroundColor: isDark ? '#1a1c26' : '#ffffff', borderColor: isDark ? '#374151' : '#e2e8f0', borderRadius: '12px', color: isDark ? '#ffffff' : '#0f172a' }} />
+                  <Bar dataKey="amount" fill="#ff4d6d" radius={[0, 6, 6, 0]} barSize={22} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
       </motion.div>
       )}
@@ -379,15 +401,8 @@ const Dashboard = () => {
               </motion.div>
             ))}
             {announcements.length === 0 && (
-              <div className="space-y-2">
-                <div className={`border p-3 rounded-xl flex justify-between items-center text-xs ${isDark ? 'bg-[#1a1c26] border-gray-800 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-700'}`}>
-                  <span>Annual Hostel General Meetup</span>
-                  <span className="text-gray-500">Posted by admin@hostel.com</span>
-                </div>
-                <div className={`border p-3 rounded-xl flex justify-between items-center text-xs ${isDark ? 'bg-[#1a1c26] border-gray-800 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-700'}`}>
-                  <span>Water Supply Maintenance Schedule</span>
-                  <span className="text-gray-500">Posted by leader@hostel.com</span>
-                </div>
+              <div className={`p-8 text-center rounded-xl border border-dashed text-xs ${isDark ? 'border-gray-800 text-gray-400' : 'border-gray-300 text-gray-500'}`}>
+                No announcements published yet.
               </div>
             )}
           </div>
