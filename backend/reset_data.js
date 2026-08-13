@@ -12,7 +12,8 @@ const Task = require('./models/Task');
 const TrustMember = require('./models/TrustMember');
 const connectDB = require('./config/db');
 
-dotenv.config();
+const path = require('path');
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const resetData = async () => {
   try {
