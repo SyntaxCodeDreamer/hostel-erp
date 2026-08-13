@@ -275,17 +275,6 @@ const Announcements = () => {
           </div>
         )}
 
-        {hasMore && !loading && (
-          <div className="col-span-full flex justify-center pt-2 pb-4">
-            <button
-              onClick={loadMoreAnnouncements}
-              className="px-6 py-2.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 rounded-xl text-xs font-bold transition shadow-sm"
-            >
-              Load Older Announcements
-            </button>
-          </div>
-        )}
-
         {loading && (
           <div className="col-span-full py-6 flex flex-col items-center justify-center gap-2">
             <div className="glowing-arc-spinner"></div>
