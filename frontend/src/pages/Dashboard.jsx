@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+import LoadingSpinner from '../components/LoadingSpinner';
+
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -77,11 +79,7 @@ const Dashboard = () => {
   // Student view restriction removed so they can access the awesome dashboard widgets
 
   if (loading && !data) {
-    return (
-      <div className="flex justify-center items-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-500"></div>
-      </div>
-    );
+    return <LoadingSpinner label="Loading Dashboard Analytics..." />;
   }
 
   const d = data || {

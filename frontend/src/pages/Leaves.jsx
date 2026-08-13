@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { Calendar, Plus, MapPin, Search } from 'lucide-react';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const Leaves = () => {
   const [leaves, setLeaves] = useState([]);
@@ -130,9 +131,7 @@ const Leaves = () => {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-        </div>
+        <LoadingSpinner label="Loading Leave Requests..." />
       ) : (
         <div className={`rounded-2xl border overflow-hidden shadow-sm ${isDark ? 'bg-[#14161f] border-gray-800' : 'bg-white border-gray-200'}`}>
           <div className={`p-4 border-b font-bold text-sm flex items-center justify-between ${isDark ? 'border-gray-800/60 text-white' : 'border-gray-100 text-gray-900'}`}>

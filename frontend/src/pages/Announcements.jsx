@@ -3,6 +3,7 @@ import apiClient from '../utils/apiClient';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { Pin, Plus, Trash2, Calendar, User as UserIcon } from 'lucide-react';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const Announcements = () => {
   const { user } = useContext(AuthContext);
@@ -126,6 +127,10 @@ const Announcements = () => {
     const d = new Date(dateStr);
     return isNaN(d.getTime()) ? new Date().toLocaleDateString() : d.toLocaleDateString();
   };
+
+  if (initialLoading) {
+    return <LoadingSpinner label="Loading Announcements..." />;
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -282,9 +287,9 @@ const Announcements = () => {
         )}
 
         {loading && (
-          <div className="col-span-full py-6 flex justify-center items-center gap-2 text-sm text-indigo-500 font-medium">
-            <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-            Loading more announcements...
+          <div className="col-span-full py-6 flex flex-col items-center justify-center gap-2">
+            <div className="glowing-arc-spinner"></div>
+            <span className="text-xs text-indigo-400 font-semibold tracking-wider animate-pulse">Loading more announcements...</span>
           </div>
         )}
 

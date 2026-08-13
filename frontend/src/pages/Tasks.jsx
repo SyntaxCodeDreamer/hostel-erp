@@ -3,6 +3,7 @@ import apiClient from '../utils/apiClient';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { Plus, Clock, User as UserIcon, AlertTriangle } from 'lucide-react';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const Tasks = () => {
   const { user } = useContext(AuthContext);
@@ -171,6 +172,10 @@ const Tasks = () => {
     if (s === 'in_progress' || s === 'in progress') return 'bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-400 dark:border dark:border-blue-800/50';
     return 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-400 dark:border dark:border-amber-800/50';
   };
+
+  if (initialLoading) {
+    return <LoadingSpinner label="Loading Tasks..." />;
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -356,9 +361,9 @@ const Tasks = () => {
         )}
 
         {loading && (
-          <div className="col-span-full py-6 flex justify-center items-center gap-2 text-sm text-indigo-500 font-medium">
-            <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-            Loading more tasks...
+          <div className="col-span-full py-6 flex flex-col items-center justify-center gap-2">
+            <div className="glowing-arc-spinner"></div>
+            <span className="text-xs text-indigo-400 font-semibold tracking-wider animate-pulse">Loading more tasks...</span>
           </div>
         )}
 

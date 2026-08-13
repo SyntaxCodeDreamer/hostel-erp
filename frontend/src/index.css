@@ -7,3 +7,25 @@
     @apply bg-gray-50 text-gray-900;
   }
 }
+
+@layer utilities {
+  .glowing-arc-spinner {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 2.5px solid transparent;
+    border-bottom-color: #818cf8;
+    border-left-color: rgba(129, 140, 248, 0.4);
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.5);
+    animation: arcSpin 0.75s linear infinite;
+  }
+}
+
+@keyframes arcSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

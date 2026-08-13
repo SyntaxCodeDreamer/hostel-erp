@@ -3,6 +3,7 @@ import apiClient from '../utils/apiClient';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { Eye, X, Phone, MapPin, GraduationCap, Edit3, Save, CheckCircle, ExternalLink, Link as LinkIcon, TrendingUp, Plus, Trash2, Award, FileText, Search } from 'lucide-react';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const Students = () => {
   const [students, setStudents] = useState([]);
@@ -315,9 +316,7 @@ const Students = () => {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-        </div>
+        <LoadingSpinner label="Loading Student Records..." />
       ) : isStudent ? (
         /* INLINE STUDENT PROFILE VIEW FOR STUDENTS */
         selectedStudent ? (

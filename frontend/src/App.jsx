@@ -20,12 +20,10 @@ const Announcements = lazy(() => import('./pages/Announcements'));
 const Expenses = lazy(() => import('./pages/Expenses'));
 const TrustLeader = lazy(() => import('./pages/TrustLeader'));
 
+import LoadingSpinner from './components/LoadingSpinner';
+
 // Sleek loading spinner fallback for route transitions
-const PageLoader = () => (
-  <div className="flex items-center justify-center min-h-[60vh]">
-    <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500"></div>
-  </div>
-);
+const PageLoader = () => <LoadingSpinner label="Loading..." />;
 
 function App() {
   return (
