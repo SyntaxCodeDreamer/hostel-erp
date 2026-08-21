@@ -10,7 +10,7 @@ const { sendWelcomeEmail, getBrevoDefaultPassword } = require('../utils/sendEmai
 // @access  Private
 const getTrustMembers = async (req, res) => {
   try {
-    const members = await TrustMember.find({});
+    const members = await TrustMember.find({}).lean();
     res.json(members);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -97,7 +97,7 @@ const deleteTrustMember = async (req, res) => {
 // @access  Private
 const getLeaders = async (req, res) => {
   try {
-    const leaders = await LeaderProfile.find({}).populate('userId', 'name email');
+    const leaders = await LeaderProfile.find({}).populate('userId', 'name email').lean();
     res.json(leaders);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });

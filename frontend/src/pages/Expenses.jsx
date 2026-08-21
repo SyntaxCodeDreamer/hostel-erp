@@ -17,8 +17,13 @@ const Expenses = () => {
   const isAdminOrLeader = user?.role === 'Admin' || user?.role === 'Leader' || user?.role === 'admin' || user?.role === 'leader';
 
   useEffect(() => {
-    fetchExpenses();
-    fetchSummary();
+    Promise.all([
+      apiClient.get('/expenses').catch(() => ({ data: [] })),
+      apiClient.get('/expenses/summary/monthly').catch(() => ({ data: [] }))
+    ]).then(([expRes, sumRes]) => {
+      setExpenses(Array.isArray(expRes.data) ? expRes.data : []);
+      setSummary(Array.isArray(sumRes.data) ? sumRes.data : []);
+    });
   }, []);
 
   const fetchExpenses = async () => {

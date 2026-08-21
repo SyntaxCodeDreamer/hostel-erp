@@ -7,7 +7,8 @@ const getExpenses = async (req, res) => {
   try {
     const expenses = await Expense.find({})
       .populate('addedBy', 'name')
-      .sort({ date: -1 });
+      .sort({ date: -1 })
+      .lean();
     res.json(expenses);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });

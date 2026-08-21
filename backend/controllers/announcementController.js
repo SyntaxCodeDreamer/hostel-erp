@@ -33,7 +33,8 @@ const getAnnouncements = async (req, res) => {
         .populate('createdBy', 'name role')
         .sort({ isPinned: -1, createdAt: -1 })
         .skip(skip)
-        .limit(limitNum);
+        .limit(limitNum)
+        .lean();
 
       const totalPages = Math.ceil(totalCount / limitNum) || 1;
       const hasMore = pageNum < totalPages;
@@ -49,7 +50,8 @@ const getAnnouncements = async (req, res) => {
 
     const announcements = await Announcement.find(filterQuery)
       .populate('createdBy', 'name role')
-      .sort({ isPinned: -1, createdAt: -1 });
+      .sort({ isPinned: -1, createdAt: -1 })
+      .lean();
     res.json(announcements);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -86,7 +88,7 @@ const createAnnouncement = async (req, res) => {
       userQuery.role = { $in: ['Student', 'student'] };
     }
 
-    const recipientUsers = await User.find(userQuery);
+    const recipientUsers = await User.find(userQuery).select('_id').lean();
     const recipientUserIds = [];
 
     for (const u of recipientUsers) {

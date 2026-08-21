@@ -30,6 +30,7 @@ const studentSchema = new mongoose.Schema({
   mobile: { type: String, required: true },
   parentsMobile: { type: String, required: true },
   drivingLicense: { type: Boolean, default: false },
+  drivingLicenseProofUrl: { type: String, default: '' },
   roomNumber: { type: String, required: true },
   status: {
     type: String,
@@ -53,6 +54,10 @@ const studentSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+studentSchema.index({ userId: 1 });
+studentSchema.index({ status: 1 });
+studentSchema.index({ mobile: 1 });
 
 const Student = mongoose.model('Student', studentSchema);
 

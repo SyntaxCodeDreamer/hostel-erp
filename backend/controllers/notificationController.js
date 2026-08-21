@@ -6,8 +6,8 @@ const Announcement = require('../models/Announcement');
 // @access  Private
 const getNotifications = async (req, res) => {
   try {
-    // Sync existing announcements so newly registered users see all active/past announcements
-    const announcements = await Announcement.find({}).sort({ createdAt: -1 });
+    // Sync latest announcements efficiently (limited to last 10)
+    const announcements = await Announcement.find({}).sort({ createdAt: -1 }).limit(10).lean();
 
     for (const ann of announcements) {
       if (ann.createdBy && ann.createdBy.toString() === req.user._id.toString()) {
@@ -19,7 +19,7 @@ const getNotifications = async (req, res) => {
         continue;
       }
 
-      const existingNotif = await Notification.findOne({
+      const existingNotif = await Notification.exists({
         userId: req.user._id,
         message: `${ann.title} - ${ann.category}`
       });
@@ -38,7 +38,8 @@ const getNotifications = async (req, res) => {
 
     const notifications = await Notification.find({ userId: req.user._id, isRead: false })
       .sort({ createdAt: -1 })
-      .limit(30);
+      .limit(30)
+      .lean();
 
     res.json(notifications);
   } catch (error) {

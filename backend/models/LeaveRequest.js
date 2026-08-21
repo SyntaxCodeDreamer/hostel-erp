@@ -24,6 +24,9 @@ const leaveRequestSchema = new mongoose.Schema({
   timestamps: true
 });
 
+leaveRequestSchema.index({ studentId: 1, status: 1 });
+leaveRequestSchema.index({ createdAt: -1 });
+
 const LeaveRequest = mongoose.model('LeaveRequest', leaveRequestSchema);
 
 module.exports = LeaveRequest;

@@ -1,4 +1,6 @@
+const Task = require('../models/Task');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 const { sendPushNotification } = require('../utils/webPush');
 
 // Helper to check for overdue tasks and send alerts to Admins & Leaders
@@ -87,7 +89,8 @@ const getTasks = async (req, res) => {
         .populate('createdBy', 'name role')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limitNum);
+        .limit(limitNum)
+        .lean();
 
       const totalPages = Math.ceil(totalCount / limitNum) || 1;
       const hasMore = pageNum < totalPages;
@@ -104,7 +107,8 @@ const getTasks = async (req, res) => {
     const tasks = await Task.find(query)
       .populate('assignedTo', 'name email role')
       .populate('createdBy', 'name role')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
     res.json(tasks);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });

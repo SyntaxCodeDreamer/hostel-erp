@@ -131,6 +131,32 @@ const AddStudent = () => {
                 <input type="text" name="village" value={formData.village} onChange={handleChange} required className={inputClass} placeholder="Native place" />
               </div>
               <div>
+                <label className={labelClass}>Driving License</label>
+                <select
+                  name="drivingLicense"
+                  value={formData.drivingLicense ? 'yes' : 'no'}
+                  onChange={(e) => setFormData({ ...formData, drivingLicense: e.target.value === 'yes' })}
+                  className={inputClass}
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes (Available)</option>
+                </select>
+              </div>
+              {formData.drivingLicense && (
+                <div>
+                  <label className={`${labelClass} text-indigo-400`}>Driving License Proof (Google Drive Link)</label>
+                  <input
+                    type="url"
+                    name="drivingLicenseProofUrl"
+                    value={formData.drivingLicenseProofUrl || ''}
+                    onChange={handleChange}
+                    className={inputClass}
+                    placeholder="https://drive.google.com/file/d/... or document URL"
+                  />
+                  <p className="text-[11px] text-gray-500 mt-1">Paste the Google Drive link or document URL for your Driving License proof.</p>
+                </div>
+              )}
+              <div>
                 <label className={labelClass}>Full Home Address</label>
                 <textarea name="homeAddress" value={formData.homeAddress} onChange={handleChange} required className={inputClass} rows="3" placeholder="Full residential address..."></textarea>
               </div>

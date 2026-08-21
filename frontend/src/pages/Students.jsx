@@ -1,9 +1,11 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState, useContext, useMemo } from 'react';
 import apiClient from '../utils/apiClient';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { Eye, X, Phone, MapPin, GraduationCap, Edit3, Save, CheckCircle, ExternalLink, Link as LinkIcon, TrendingUp, Plus, Trash2, Award, FileText, Search } from 'lucide-react';
+import { ThemeContext } from '../context/ThemeContext';
+import { Eye, X, Phone, MapPin, GraduationCap, Edit3, Save, CheckCircle, ExternalLink, Link as LinkIcon, TrendingUp, Plus, Trash2, Award, FileText, Search, ShieldCheck, CheckCircle2, FileSpreadsheet, Upload } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
+import * as XLSX from 'xlsx';
 
 const Students = () => {
   const [students, setStudents] = useState([]);
@@ -15,6 +17,8 @@ const Students = () => {
   const [studentLeaveCount, setStudentLeaveCount] = useState(0);
   const [leavesList, setLeavesList] = useState([]);
   const { user } = useContext(AuthContext);
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
 
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -34,6 +38,9 @@ const Students = () => {
 
   const isStudent = (user?.role || '').toLowerCase() === 'student';
   const isAdmin = (user?.role || '').toLowerCase() === 'admin';
+  const isLeader = (user?.role || '').toLowerCase() === 'leader';
+  const isTrustMember = ['trust member', 'trustee'].includes((user?.role || '').toLowerCase());
+  const canManageProgress = !isTrustMember;
 
   const handleAddProgress = async (e) => {
     e.preventDefault();
@@ -278,33 +285,116 @@ const Students = () => {
     return raw.charAt(0).toUpperCase() + raw.slice(1);
   };
 
-  const filteredStudents = students.filter((student) => {
-    const name = getStudentName(student).toLowerCase();
-    const email = getStudentEmail(student).toLowerCase();
-    const course = (student.course || '').toLowerCase();
-    const room = (student.roomNumber || '').toLowerCase();
+  const filteredStudents = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    return name.includes(q) || email.includes(q) || course.includes(q) || room.includes(q);
-  });
+    if (!q) return students;
+    return students.filter((student) => {
+      const name = getStudentName(student).toLowerCase();
+      const email = getStudentEmail(student).toLowerCase();
+      const course = (student.course || '').toLowerCase();
+      const room = (student.roomNumber || '').toLowerCase();
+      return name.includes(q) || email.includes(q) || course.includes(q) || room.includes(q);
+    });
+  }, [students, searchQuery]);
 
   const totalPages = Math.ceil(filteredStudents.length / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedStudents = filteredStudents.slice(startIndex, startIndex + itemsPerPage);
 
+  const exportStudentsToExcel = () => {
+    if (!students || students.length === 0) return;
+
+    const data = students.map((s, idx) => ({
+      '#': idx + 1,
+      'Name': getStudentName(s),
+      'Email': getStudentEmail(s),
+      'Status': getStudentStatus(s),
+      'Mobile': s.mobile || s.mobileNumber || '',
+      'Parents Mobile': s.parentsMobile || s.parentMobile || '',
+      'Room Number': s.roomNumber || 'Unassigned',
+      'Course': s.course || '',
+      'College Name': s.collegeName || '',
+      'Village / Town': s.village || '',
+      'Driving License': s.drivingLicense ? 'Yes' : 'No',
+      'Home Address': s.homeAddress || '',
+      'Other Course / Job': s.otherCourseOrJob || ''
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Students Directory');
+    XLSX.writeFile(wb, `Hostel_Students_Directory_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  const handleImportExcel = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const rawData = XLSX.utils.sheet_to_json(ws);
+
+        if (rawData.length === 0) {
+          alert('No records found in uploaded Excel sheet.');
+          return;
+        }
+
+        let importedCount = 0;
+        for (const row of rawData) {
+          const payload = {
+            fullName: row.Name || row['Full Name'] || row.FullName || row['Student Name'] || 'Student',
+            email: row.Email || row['Email Address'] || `student_${Date.now()}_${Math.floor(Math.random()*1000)}@hostel.com`,
+            mobile: String(row.Mobile || row['Mobile Number'] || row['Phone'] || ''),
+            parentsMobile: String(row['Parents Mobile'] || row['Emergency Contact'] || ''),
+            roomNumber: String(row['Room Number'] || row['Room'] || ''),
+            course: String(row.Course || ''),
+            collegeName: String(row['College Name'] || row.College || ''),
+            village: String(row['Village / Town'] || row.Village || ''),
+            drivingLicense: String(row['Driving License'] || '').toLowerCase() === 'yes',
+            homeAddress: String(row['Home Address'] || row.Address || ''),
+            status: String(row.Status || 'active').toLowerCase()
+          };
+
+          try {
+            await apiClient.post('/students', payload);
+            importedCount++;
+          } catch (err) {
+            console.error('Error importing row:', row, err);
+          }
+        }
+
+        setSaveSuccess(`Successfully imported ${importedCount} students from Excel!`);
+        fetchStudents();
+        setTimeout(() => setSaveSuccess(''), 4000);
+      } catch (err) {
+        console.error('Excel parse error:', err);
+        alert('Failed to parse Excel sheet. Please ensure it is a valid .xlsx or .csv file.');
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   return (
     <div className="p-2 sm:p-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{isStudent ? 'My Student Profile' : 'Students'}</h1>
           <p className="text-sm opacity-70">{isStudent ? 'View and update your personal hostel details' : 'Manage and track student resident records.'}</p>
         </div>
         {isAdmin && (
-          <Link 
-            to="/students/add" 
-            className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 transition shadow-sm"
-          >
-            + Add Student
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link 
+              to="/students/add" 
+              className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-700 transition shadow-sm"
+            >
+              + Add Student
+            </Link>
+          </div>
         )}
       </div>
 
@@ -320,7 +410,7 @@ const Students = () => {
       ) : isStudent ? (
         /* INLINE STUDENT PROFILE VIEW FOR STUDENTS */
         selectedStudent ? (
-          <div className="bg-[#14161f] text-gray-100 rounded-2xl shadow-xl border border-gray-800/80 overflow-hidden">
+          <div className={`rounded-2xl shadow-xl border overflow-hidden transition ${isDark ? 'bg-[#14161f] text-gray-100 border-gray-800/80' : 'bg-white text-gray-900 border-gray-200'}`}>
             {/* Header Banner */}
             <div className="relative bg-gradient-to-r from-indigo-700 via-purple-700 to-indigo-900 text-white p-6 flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center space-x-4">
@@ -361,98 +451,113 @@ const Students = () => {
                     <Edit3 size={16} /> Edit My Personal Details
                   </h3>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-[#1a1c26] p-4 rounded-xl border border-gray-800">
+                  <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl border ${isDark ? 'bg-[#1a1c26] border-gray-800' : 'bg-gray-50 border-gray-200'}`}>
                     <div>
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Student Mobile</label>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Student Mobile</label>
                       <input
                         type="text"
                         value={editForm.mobile}
                         onChange={(e) => setEditForm({ ...editForm, mobile: e.target.value })}
-                        className="w-full bg-[#14161f] border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className={`w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 ${isDark ? 'bg-[#14161f] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                         placeholder="Mobile number..."
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Parents / Emergency Mobile</label>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Parents / Emergency Mobile</label>
                       <input
                         type="text"
                         value={editForm.parentsMobile}
                         onChange={(e) => setEditForm({ ...editForm, parentsMobile: e.target.value })}
-                        className="w-full bg-[#14161f] border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className={`w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 ${isDark ? 'bg-[#14161f] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                         placeholder="Emergency contact..."
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Native Village / Town</label>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Native Village / Town</label>
                       <input
                         type="text"
                         value={editForm.village}
                         onChange={(e) => setEditForm({ ...editForm, village: e.target.value })}
-                        className="w-full bg-[#14161f] border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className={`w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 ${isDark ? 'bg-[#14161f] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                         placeholder="Village name..."
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Driving License</label>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Driving License</label>
                       <select
                         value={editForm.drivingLicense ? 'yes' : 'no'}
                         onChange={(e) => setEditForm({ ...editForm, drivingLicense: e.target.value === 'yes' })}
-                        className="w-full bg-[#14161f] border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className={`w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 ${isDark ? 'bg-[#14161f] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                       >
                         <option value="no">No</option>
                         <option value="yes">Yes (Available)</option>
                       </select>
                     </div>
+                    {editForm.drivingLicense && (
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-bold uppercase mb-1 flex items-center gap-1.5 text-indigo-400">
+                          <LinkIcon size={14} /> Driving License Proof (Google Drive Link)
+                        </label>
+                        <input
+                          type="url"
+                          value={editForm.drivingLicenseProofUrl || ''}
+                          onChange={(e) => setEditForm({ ...editForm, drivingLicenseProofUrl: e.target.value })}
+                          className={`w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 ${isDark ? 'bg-[#14161f] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                          placeholder="https://drive.google.com/file/d/... or document URL"
+                        />
+                        <p className="text-[11px] text-gray-500 mt-1">Paste the Google Drive link or document URL for your Driving License proof.</p>
+                      </div>
+                    )}
                     <div className="sm:col-span-2">
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Full Home Address</label>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Full Home Address</label>
                       <textarea
                         rows="2"
                         value={editForm.homeAddress}
                         onChange={(e) => setEditForm({ ...editForm, homeAddress: e.target.value })}
-                        className="w-full bg-[#14161f] border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className={`w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 ${isDark ? 'bg-[#14161f] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                         placeholder="Full street address..."
                       />
                     </div>
                     <div className="sm:col-span-2">
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1 flex items-center gap-1.5 text-indigo-400">
+                      <label className="block text-xs font-bold uppercase mb-1 flex items-center gap-1.5 text-indigo-500">
                         <LinkIcon size={14} /> Exam Results Drive Link
                       </label>
                       <input
                         type="url"
                         value={editForm.resultDriveLink || editForm.resultUrl || ''}
                         onChange={(e) => setEditForm({ ...editForm, resultDriveLink: e.target.value, resultUrl: e.target.value })}
-                        className="w-full bg-[#14161f] border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className={`w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 ${isDark ? 'bg-[#14161f] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                         placeholder="https://drive.google.com/file/d/... or Google Drive folder URL"
                       />
                       <p className="text-[11px] text-gray-500 mt-1">Paste your Google Drive link or document URL for your exam results.</p>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Enrolled Course</label>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Enrolled Course</label>
                       <input
                         type="text"
                         value={editForm.course}
                         onChange={(e) => setEditForm({ ...editForm, course: e.target.value })}
-                        className="w-full bg-[#14161f] border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className={`w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 ${isDark ? 'bg-[#14161f] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                         placeholder="e.g. B.Tech Computer Science..."
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">College Name</label>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>College Name</label>
                       <input
                         type="text"
                         value={editForm.collegeName}
                         onChange={(e) => setEditForm({ ...editForm, collegeName: e.target.value })}
-                        className="w-full bg-[#14161f] border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className={`w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 ${isDark ? 'bg-[#14161f] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                         placeholder="College / Institute name..."
                       />
                     </div>
                     <div className="sm:col-span-2">
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Other Course / Job Details</label>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Other Course / Job Details</label>
                       <input
                         type="text"
                         value={editForm.otherCourseOrJob}
                         onChange={(e) => setEditForm({ ...editForm, otherCourseOrJob: e.target.value })}
-                        className="w-full bg-[#14161f] border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className={`w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 ${isDark ? 'bg-[#14161f] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                         placeholder="Part-time job or certificate details..."
                       />
                     </div>
@@ -769,7 +874,7 @@ const Students = () => {
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3.5 top-3 text-gray-400" size={16} />
+              <Search className={`absolute left-3.5 top-3 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} size={16} />
               <input
                 type="text"
                 value={searchQuery}
@@ -778,28 +883,34 @@ const Students = () => {
                   setCurrentPage(1);
                 }}
                 placeholder="Search by student name, course, or room..."
-                className="w-full pl-10 pr-4 py-2.5 bg-[#14161f] border border-gray-800 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"
+                className={`w-full pl-10 pr-4 py-2.5 rounded-xl text-sm border focus:outline-none focus:border-indigo-500 transition ${
+                  isDark 
+                    ? 'bg-[#14161f] border-gray-800 text-white placeholder-gray-500' 
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 shadow-xs'
+                }`}
               />
             </div>
-            <div className="text-xs text-gray-400 font-semibold">
+            <div className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
               Showing {filteredStudents.length} student{filteredStudents.length !== 1 ? 's' : ''}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-gray-800/80 bg-[#14161f] overflow-hidden shadow-sm">
+          <div className={`rounded-2xl border overflow-hidden shadow-sm transition ${
+            isDark ? 'bg-[#14161f] border-gray-800/80' : 'bg-white border-gray-200'
+          }`}>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-800">
-                <thead className="bg-[#1a1c26]">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800/60">
+                <thead className={isDark ? 'bg-[#1a1c26]' : 'bg-gray-50/90'}>
                   <tr>
-                    <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Student Info</th>
-                    <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Course & College</th>
-                    <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Room</th>
-                    <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Mobile</th>
-                    <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3.5 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
+                    <th className={`px-6 py-3.5 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Student Info</th>
+                    <th className={`px-6 py-3.5 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Course & College</th>
+                    <th className={`px-6 py-3.5 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Room</th>
+                    <th className={`px-6 py-3.5 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Mobile</th>
+                    <th className={`px-6 py-3.5 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Status</th>
+                    <th className={`px-6 py-3.5 text-center text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-800/60">
+                <tbody className={`divide-y ${isDark ? 'divide-gray-800/60' : 'divide-gray-200'}`}>
                   {paginatedStudents.map((student) => {
                     const sName = getStudentName(student);
                     const sEmail = getStudentEmail(student);
@@ -807,33 +918,35 @@ const Students = () => {
                     const sMobile = student.mobile || student.mobileNumber || 'N/A';
 
                     return (
-                      <tr key={student._id} onClick={() => handleViewProfile(student)} className="hover:bg-gray-800/40 transition cursor-pointer">
+                      <tr key={student._id} onClick={() => handleViewProfile(student)} className={`transition cursor-pointer ${isDark ? 'hover:bg-gray-800/40' : 'hover:bg-gray-50'}`}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
-                            <div className="h-10 w-10 flex-shrink-0 rounded-full bg-indigo-900/60 text-indigo-300 border border-indigo-700/50 flex items-center justify-center font-bold text-base">
+                            <div className={`h-10 w-10 flex-shrink-0 rounded-full border flex items-center justify-center font-bold text-base ${
+                              isDark ? 'bg-indigo-900/60 text-indigo-300 border-indigo-700/50' : 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                            }`}>
                               {sName.charAt(0).toUpperCase()}
                             </div>
                             <div className="ml-3">
-                              <div className="text-sm font-semibold text-white">{sName}</div>
-                              <div className="text-xs text-gray-400">{sEmail}</div>
+                              <div className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{sName}</div>
+                              <div className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{sEmail}</div>
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-200">{student.course || 'N/A'}</div>
-                          <div className="text-xs text-gray-400">{student.collegeName || 'N/A'}</div>
+                          <div className={`text-sm font-medium ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>{student.course || 'N/A'}</div>
+                          <div className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{student.collegeName || 'N/A'}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">
+                        <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
                           {student.roomNumber ? `Room ${student.roomNumber}` : 'Unassigned'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{sMobile}</td>
+                        <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{sMobile}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2.5 py-1 inline-flex text-xs font-semibold rounded-full ${
                             sStatus === 'Active' 
-                              ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/50' 
+                              ? isDark ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/50' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                               : sStatus === 'On Leave' || sStatus === 'On leave'
-                              ? 'bg-amber-950/80 text-amber-400 border border-amber-800/50'
-                              : 'bg-rose-950/80 text-rose-400 border border-rose-800/50'
+                              ? isDark ? 'bg-amber-950/80 text-amber-400 border border-amber-800/50' : 'bg-amber-100 text-amber-800 border border-amber-200'
+                              : isDark ? 'bg-rose-950/80 text-rose-400 border border-rose-800/50' : 'bg-rose-100 text-rose-800 border border-rose-200'
                           }`}>
                             {sStatus}
                           </span>
@@ -842,7 +955,9 @@ const Students = () => {
                           <div className="flex items-center justify-center gap-2">
                             <button
                               onClick={() => handleViewProfile(student)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-950/60 text-indigo-300 border border-indigo-800/50 hover:bg-indigo-900/80 text-xs font-semibold transition"
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
+                                isDark ? 'bg-indigo-950/60 text-indigo-300 border-indigo-800/50 hover:bg-indigo-900/80' : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                              }`}
                             >
                               <Eye size={14} />
                               View Profile
@@ -853,7 +968,9 @@ const Students = () => {
                                   e.stopPropagation();
                                   handleDeleteStudent(student._id);
                                 }}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-950/60 text-rose-300 border border-rose-800/50 hover:bg-rose-900/80 text-xs font-semibold transition"
+                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
+                                  isDark ? 'bg-rose-950/60 text-rose-300 border-rose-800/50 hover:bg-rose-900/80' : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                                }`}
                                 title="Delete Student"
                               >
                                 <Trash2 size={14} />
@@ -867,7 +984,7 @@ const Students = () => {
                   })}
                   {filteredStudents.length === 0 && (
                     <tr>
-                      <td colSpan="6" className="px-6 py-8 text-center text-gray-400">
+                      <td colSpan="6" className={`px-6 py-8 text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                         No student records found.
                       </td>
                     </tr>
@@ -878,18 +995,22 @@ const Students = () => {
 
             {/* Pagination Controls Footer */}
             {filteredStudents.length > 0 && (
-              <div className="px-6 py-4 border-t border-gray-800 flex flex-wrap items-center justify-between gap-4 text-xs text-gray-400 bg-[#14161f]">
+              <div className={`px-6 py-4 border-t flex flex-wrap items-center justify-between gap-4 text-xs ${
+                isDark ? 'bg-[#14161f] border-gray-800 text-gray-400' : 'bg-gray-50/90 border-gray-200 text-gray-600'
+              }`}>
                 <div>
-                  Showing <span className="font-bold text-white">{startIndex + 1}</span> to{' '}
-                  <span className="font-bold text-white">{Math.min(startIndex + itemsPerPage, filteredStudents.length)}</span> of{' '}
-                  <span className="font-bold text-white">{filteredStudents.length}</span> students
+                  Showing <span className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{startIndex + 1}</span> to{' '}
+                  <span className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{Math.min(startIndex + itemsPerPage, filteredStudents.length)}</span> of{' '}
+                  <span className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{filteredStudents.length}</span> students
                 </div>
 
                 <div className="flex items-center gap-2">
                   <button
                     disabled={currentPage === 1}
                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    className="px-3 py-1.5 rounded-lg border border-gray-700 bg-[#1a1c26] text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium"
+                    className={`px-3 py-1.5 rounded-lg border transition font-medium disabled:opacity-40 disabled:cursor-not-allowed ${
+                      isDark ? 'border-gray-700 bg-[#1a1c26] text-white hover:bg-gray-800' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
                   >
                     Previous
                   </button>
@@ -902,7 +1023,9 @@ const Students = () => {
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
                           currentPage === pageNum
                             ? 'bg-indigo-600 text-white shadow-xs'
-                            : 'border border-gray-700 bg-[#1a1c26] text-gray-300 hover:bg-gray-800'
+                            : isDark
+                            ? 'border border-gray-700 bg-[#1a1c26] text-gray-300 hover:bg-gray-800'
+                            : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-100'
                         }`}
                       >
                         {pageNum}
@@ -913,7 +1036,9 @@ const Students = () => {
                   <button
                     disabled={currentPage === totalPages}
                     onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    className="px-3 py-1.5 rounded-lg border border-gray-700 bg-[#1a1c26] text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium"
+                    className={`px-3 py-1.5 rounded-lg border transition font-medium disabled:opacity-40 disabled:cursor-not-allowed ${
+                      isDark ? 'border-gray-700 bg-[#1a1c26] text-white hover:bg-gray-800' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
                   >
                     Next
                   </button>
@@ -923,11 +1048,12 @@ const Students = () => {
           </div>
         </div>
       )}
-
       {/* FULL STUDENT PROFILE MODAL FOR ADMIN / LEADER */}
       {!isStudent && selectedStudent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
-          <div className="bg-[#14161f] text-gray-100 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-gray-800 animate-in fade-in zoom-in duration-150">
+          <div className={`rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border animate-in fade-in zoom-in duration-150 ${
+            isDark ? 'bg-[#14161f] text-gray-100 border-gray-800' : 'bg-white text-gray-900 border-gray-200'
+          }`}>
             
             {/* Modal Header */}
             <div className="relative bg-gradient-to-r from-indigo-700 to-purple-800 text-white p-6 rounded-t-2xl flex items-center justify-between">
@@ -950,57 +1076,53 @@ const Students = () => {
               </div>
 
               <div className="flex items-center gap-2">
-                {!isEditing && (
+                {!isEditing && (isAdmin || isLeader) && (
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5"
+                    className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1"
                   >
                     <Edit3 size={14} />
-                    Edit Profile
-                  </button>
-                )}
-                {!isStudent && (
-                  <button
-                    onClick={() => handleDeleteStudent(selectedStudent._id)}
-                    className="bg-rose-500/30 hover:bg-rose-500/50 text-white border border-rose-400/40 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5"
-                    title="Delete Student"
-                  >
-                    <Trash2 size={14} />
-                    Delete Student
+                    Edit
                   </button>
                 )}
                 <button
-                  onClick={() => { setSelectedStudent(null); setIsEditing(false); }}
-                  className="text-white/80 hover:text-white p-1.5 rounded-full hover:bg-white/10 transition ml-2"
+                  onClick={() => setSelectedStudent(null)}
+                  className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-full transition"
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
               </div>
             </div>
 
             {/* Modal Body */}
             <div className="p-6 space-y-6">
+              {saveSuccess && (
+                <div className="p-3 bg-emerald-950/80 border border-emerald-700/60 text-emerald-300 text-xs font-semibold rounded-xl flex items-center gap-2">
+                  <CheckCircle2 size={16} />
+                  {saveSuccess}
+                </div>
+              )}
 
-              {/* Status Update Banner for Admin */}
-              {!isStudent && !isEditing && (
-                <div className="bg-[#1a1c26] border border-gray-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h4 className="text-xs font-bold uppercase text-gray-400 tracking-wider">Quick Status Update</h4>
-                    <p className="text-sm text-gray-300 font-medium">Current Status: <span className="font-semibold text-indigo-400">{getStudentStatus(selectedStudent)}</span></p>
+              {/* Status Selector Bar for Admin */}
+              {isAdmin && !isEditing && (
+                <div className={`p-4 rounded-xl border flex flex-wrap items-center justify-between gap-3 ${
+                  isDark ? 'bg-[#1a1c26] border-gray-800' : 'bg-gray-50 border-gray-200'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck size={18} className="text-indigo-400" />
+                    <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Quick Status Action:</span>
                   </div>
-                  <div className="flex gap-2">
-                    {['Active', 'On Leave', 'Left'].map((st) => (
+                  <div className="flex items-center gap-2">
+                    {['Active', 'On Leave', 'In-Active'].map((st) => (
                       <button
                         key={st}
-                        onClick={() => {
-                          handleStatusChange(st);
-                          setSaveSuccess(`Status updated to ${st}`);
-                          setTimeout(() => setSaveSuccess(''), 3000);
-                        }}
+                        onClick={() => handleStatusChange(st)}
                         className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
                           getStudentStatus(selectedStudent) === st
                             ? 'bg-indigo-600 text-white shadow-xs'
-                            : 'bg-[#222533] border border-gray-700 text-gray-300 hover:bg-gray-800'
+                            : isDark
+                            ? 'bg-[#222533] border border-gray-700 text-gray-300 hover:bg-gray-800'
+                            : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100'
                         }`}
                       >
                         Set {st}
@@ -1014,91 +1136,109 @@ const Students = () => {
               {isEditing ? (
                 <form onSubmit={handleSaveProfile} className="space-y-4">
                   <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <Edit3 size={16} /> Edit My Personal Details
+                    <Edit3 size={16} /> Edit Student Profile
                   </h3>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-[#1a1c26] p-4 rounded-xl border border-gray-800">
+                  <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl border ${
+                    isDark ? 'bg-[#1a1c26] border-gray-800' : 'bg-gray-50 border-gray-200'
+                  }`}>
                     <div>
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Student Mobile</label>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Student Mobile</label>
                       <input
                         type="text"
                         value={editForm.mobile}
                         onChange={(e) => setEditForm({ ...editForm, mobile: e.target.value })}
-                        className="w-full bg-[#14161f] border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className={`w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 ${
+                          isDark ? 'bg-[#14161f] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                        }`}
                         placeholder="Mobile number..."
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Parents / Emergency Mobile</label>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Parents / Emergency Mobile</label>
                       <input
                         type="text"
                         value={editForm.parentsMobile}
                         onChange={(e) => setEditForm({ ...editForm, parentsMobile: e.target.value })}
-                        className="w-full bg-[#14161f] border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className={`w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 ${
+                          isDark ? 'bg-[#14161f] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                        }`}
                         placeholder="Emergency contact..."
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Native Village / Town</label>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Native Village / Town</label>
                       <input
                         type="text"
                         value={editForm.village}
                         onChange={(e) => setEditForm({ ...editForm, village: e.target.value })}
-                        className="w-full bg-[#14161f] border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className={`w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 ${
+                          isDark ? 'bg-[#14161f] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                        }`}
                         placeholder="Village name..."
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Driving License</label>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Driving License</label>
                       <select
                         value={editForm.drivingLicense ? 'yes' : 'no'}
                         onChange={(e) => setEditForm({ ...editForm, drivingLicense: e.target.value === 'yes' })}
-                        className="w-full bg-[#14161f] border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className={`w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 ${
+                          isDark ? 'bg-[#14161f] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                        }`}
                       >
                         <option value="no">No</option>
                         <option value="yes">Yes (Available)</option>
                       </select>
                     </div>
                     <div className="sm:col-span-2">
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Full Home Address</label>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Full Home Address</label>
                       <textarea
                         rows="2"
                         value={editForm.homeAddress}
                         onChange={(e) => setEditForm({ ...editForm, homeAddress: e.target.value })}
-                        className="w-full bg-[#14161f] border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className={`w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 ${
+                          isDark ? 'bg-[#14161f] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                        }`}
                         placeholder="Full street address..."
                       />
                     </div>
                     <div className="sm:col-span-2">
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1 flex items-center gap-1.5 text-indigo-400">
+                      <label className="block text-xs font-bold uppercase mb-1 flex items-center gap-1.5 text-indigo-500">
                         <LinkIcon size={14} /> Exam Results Drive Link
                       </label>
                       <input
                         type="url"
                         value={editForm.resultDriveLink || editForm.resultUrl || ''}
                         onChange={(e) => setEditForm({ ...editForm, resultDriveLink: e.target.value, resultUrl: e.target.value })}
-                        className="w-full bg-[#14161f] border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className={`w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 ${
+                          isDark ? 'bg-[#14161f] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                        }`}
                         placeholder="https://drive.google.com/file/d/... or Google Drive folder URL"
                       />
                       <p className="text-[11px] text-gray-500 mt-1">Paste your Google Drive link or document URL for your exam results.</p>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Enrolled Course</label>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Enrolled Course</label>
                       <input
                         type="text"
                         value={editForm.course}
                         onChange={(e) => setEditForm({ ...editForm, course: e.target.value })}
-                        className="w-full bg-[#14161f] border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className={`w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 ${
+                          isDark ? 'bg-[#14161f] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                        }`}
                         placeholder="e.g. B.Tech Computer Science..."
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">College Name</label>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>College Name</label>
                       <input
                         type="text"
                         value={editForm.collegeName}
                         onChange={(e) => setEditForm({ ...editForm, collegeName: e.target.value })}
-                        className="w-full bg-[#14161f] border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className={`w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 ${
+                          isDark ? 'bg-[#14161f] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                        }`}
                         placeholder="College / Institute name..."
                       />
                     </div>
@@ -1214,6 +1354,16 @@ const Students = () => {
                         <p className="text-sm font-semibold text-white">
                           {selectedStudent.drivingLicense ? 'Yes (Available)' : 'No'}
                         </p>
+                        {selectedStudent.drivingLicense && selectedStudent.drivingLicenseProofUrl && (
+                          <a
+                            href={selectedStudent.drivingLicenseProofUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 font-semibold mt-1 transition"
+                          >
+                            <ExternalLink size={13} /> View License Proof (Drive Link)
+                          </a>
+                        )}
                       </div>
                       <div className="sm:col-span-2">
                         <p className="text-xs text-gray-400 font-medium">Full Home Address</p>
@@ -1228,12 +1378,14 @@ const Students = () => {
                       <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
                         <Award size={16} className="text-indigo-400" /> Yearly Overall Progress & Accomplishments
                       </h3>
-                      <button
-                        onClick={() => setShowProgressForm(!showProgressForm)}
-                        className="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 rounded-xl text-xs font-semibold transition flex items-center gap-1"
-                      >
-                        <Plus size={14} /> {showProgressForm ? 'Close Form' : 'Add Progress Record'}
-                      </button>
+                      {canManageProgress && (
+                        <button
+                          onClick={() => setShowProgressForm(!showProgressForm)}
+                          className="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 rounded-xl text-xs font-semibold transition flex items-center gap-1"
+                        >
+                          <Plus size={14} /> {showProgressForm ? 'Close Form' : 'Add Progress Record'}
+                        </button>
+                      )}
                     </div>
 
                     {/* Progress Creation Form */}
@@ -1354,13 +1506,15 @@ const Students = () => {
                                 <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${getCategoryBadgeClass(item.category)}`}>
                                   {item.category}
                                 </span>
-                                <button
-                                  onClick={() => handleDeleteProgress(item._id)}
-                                  className="text-gray-500 hover:text-red-400 p-1 rounded-md transition"
-                                  title="Delete Progress Record"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
+                                {canManageProgress && (
+                                  <button
+                                    onClick={() => handleDeleteProgress(item._id)}
+                                    className="text-gray-500 hover:text-red-400 p-1 rounded-md transition"
+                                    title="Delete Progress Record"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
                               </div>
 
                               <h4 className="text-sm font-bold text-white mb-1">{item.title}</h4>

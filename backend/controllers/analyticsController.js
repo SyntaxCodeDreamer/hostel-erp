@@ -68,42 +68,36 @@ const getAnalytics = async (req, res) => {
       });
     }
 
-    const totalStudents = await Student.countDocuments();
-    const pendingLeaves = await LeaveRequest.countDocuments({ status: 'Pending' });
-    const pendingTasks = await Task.countDocuments({ status: { $ne: 'Completed' } });
-    
-    // Group students by course
-    const studentsByCourse = await Student.aggregate([
-      { $group: { _id: "$course", count: { $sum: 1 } } }
+    const [
+      totalStudents,
+      pendingLeaves,
+      pendingTasks,
+      studentsByCourse,
+      leavesByStatus,
+      taskStatusBreakdown,
+      expensesByCategory,
+      progressByCategory,
+      studentsWithProgress,
+      totalExpenseResult
+    ] = await Promise.all([
+      Student.countDocuments(),
+      LeaveRequest.countDocuments({ status: 'Pending' }),
+      Task.countDocuments({ status: { $ne: 'Completed' } }),
+      Student.aggregate([{ $group: { _id: "$course", count: { $sum: 1 } } }]),
+      LeaveRequest.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
+      Task.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
+      Expense.aggregate([
+        { $group: { _id: "$category", totalAmount: { $sum: "$amount" } } },
+        { $sort: { totalAmount: -1 } }
+      ]),
+      Student.aggregate([
+        { $unwind: "$progressItems" },
+        { $group: { _id: "$progressItems.category", count: { $sum: 1 } } },
+        { $sort: { count: -1 } }
+      ]),
+      Student.find({ 'progressItems.0': { $exists: true } }).populate('userId', 'name email').lean(),
+      Expense.aggregate([{ $group: { _id: null, total: { $sum: "$amount" } } }])
     ]);
-
-    // Group leaves by status
-    const leavesByStatus = await LeaveRequest.aggregate([
-      { $group: { _id: "$status", count: { $sum: 1 } } }
-    ]);
-
-    // Task status breakdown
-    const taskStatusBreakdown = await Task.aggregate([
-      { $group: { _id: "$status", count: { $sum: 1 } } }
-    ]);
-
-    // Expense breakdown by category
-    const expensesByCategory = await Expense.aggregate([
-      { $group: { _id: "$category", totalAmount: { $sum: "$amount" } } },
-      { $sort: { totalAmount: -1 } }
-    ]);
-
-    // Group student progress items by category
-    const progressByCategory = await Student.aggregate([
-      { $unwind: "$progressItems" },
-      { $group: { _id: "$progressItems.category", count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
-    ]);
-
-    // Recent student progress report items overall
-    const studentsWithProgress = await Student.find({ 'progressItems.0': { $exists: true } })
-      .populate('userId', 'name email')
-      .lean();
 
     let recentProgressItems = [];
     studentsWithProgress.forEach(st => {
@@ -120,11 +114,6 @@ const getAnalytics = async (req, res) => {
 
     recentProgressItems.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     recentProgressItems = recentProgressItems.slice(0, 3);
-
-    // Total expenses overall
-    const totalExpenseResult = await Expense.aggregate([
-      { $group: { _id: null, total: { $sum: "$amount" } } }
-    ]);
 
     const monthlyExpenseTotal = totalExpenseResult.length > 0 ? totalExpenseResult[0].total : 0;
 

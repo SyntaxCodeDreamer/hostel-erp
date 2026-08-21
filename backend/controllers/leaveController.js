@@ -13,7 +13,7 @@ const getLeaveRequests = async (req, res) => {
     const userRole = (req.user.role || '').toLowerCase();
 
     if (userRole === 'student') {
-      const student = await Student.findOne({ userId: req.user._id });
+      const student = await Student.findOne({ userId: req.user._id }).lean();
       if (!student) return res.status(404).json({ message: 'Student profile not found' });
       query.studentId = student._id;
     }
@@ -24,7 +24,8 @@ const getLeaveRequests = async (req, res) => {
         populate: { path: 'userId', select: 'name email profileImage' }
       })
       .populate('reviewedBy', 'name role')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.json(leaves);
   } catch (error) {

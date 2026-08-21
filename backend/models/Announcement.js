@@ -33,5 +33,7 @@ const announcementSchema = new mongoose.Schema({
   timestamps: true
 });
 
+announcementSchema.index({ isPinned: -1, createdAt: -1 });
+
 const Announcement = mongoose.model('Announcement', announcementSchema);
 module.exports = Announcement;

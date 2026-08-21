@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState, useContext, useMemo } from 'react';
 import apiClient from '../utils/apiClient';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
@@ -83,10 +83,19 @@ const Leaves = () => {
 
   const isAdminOrLeader = user?.role === 'Admin' || user?.role === 'Leader' || user?.role === 'admin' || user?.role === 'leader';
 
-  const filteredLeaves = leaves.filter((leave) => {
-    const status = (leave.status || '').toLowerCase();
-    return statusFilter === 'All' || status === statusFilter.toLowerCase();
-  });
+  const filteredLeaves = useMemo(() => {
+    return leaves.filter((leave) => {
+      const status = (leave.status || '').toLowerCase();
+      const matchStatus = statusFilter === 'All' || status === statusFilter.toLowerCase();
+      if (!matchStatus) return false;
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase().trim();
+      const sName = getStudentName(leave).toLowerCase();
+      const reason = (leave.reason || '').toLowerCase();
+      const dest = (leave.destination || '').toLowerCase();
+      return sName.includes(q) || reason.includes(q) || dest.includes(q);
+    });
+  }, [leaves, statusFilter, searchQuery]);
 
   const totalPages = Math.ceil(filteredLeaves.length / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;

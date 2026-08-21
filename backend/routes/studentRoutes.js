@@ -32,7 +32,7 @@ router.route('/:id/progress/:itemId')
 
 router.route('/:id')
   .get(protect, getStudentById)
-  .put(protect, updateStudent)
+  .put(protect, authorize('Admin', 'admin', 'Leader', 'leader'), updateStudent)
   .delete(protect, authorize('Admin', 'admin', 'Leader', 'leader'), deleteStudent);
 
 module.exports = router;

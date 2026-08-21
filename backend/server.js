@@ -1,12 +1,13 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
+const compression = require('compression');
 const connectDB = require('./config/db');
 
 // Load env vars
 dotenv.config();
 
-// Connect to database
+// Connect to database once at server startup
 connectDB();
 
 const http = require('http');
@@ -27,18 +28,14 @@ const io = new Server(server, {
 const connectedUsers = new Map();
 
 io.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
-
   socket.on('register', (userId) => {
     connectedUsers.set(userId, socket.id);
-    console.log(`User ${userId} registered with socket ${socket.id}`);
   });
 
   socket.on('disconnect', () => {
     for (const [userId, socketId] of connectedUsers.entries()) {
       if (socketId === socket.id) {
         connectedUsers.delete(userId);
-        console.log(`User ${userId} disconnected`);
         break;
       }
     }
@@ -49,9 +46,12 @@ io.on('connection', (socket) => {
 app.locals.io = io;
 app.locals.connectedUsers = connectedUsers;
 
-// Middleware
-app.use(express.json());
+// High performance middlewares
+app.use(compression());
+app.use(express.json({ limit: '10mb' }));
 app.use(cors());
+const fs = require('fs');
+const path = require('path');
 
 const authRoutes = require('./routes/authRoutes');
 const studentRoutes = require('./routes/studentRoutes');
@@ -63,16 +63,6 @@ const trustRoutes = require('./routes/trustRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const pushRoutes = require('./routes/pushRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
-const fs = require('fs');
-const path = require('path');
-
-// Ensure database connection for API routes
-app.use(async (req, res, next) => {
-  if (req.path.startsWith('/api')) {
-    await connectDB();
-  }
-  next();
-});
 
 // API Routes
 app.use('/api/auth', authRoutes);

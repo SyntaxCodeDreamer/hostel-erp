@@ -15,7 +15,7 @@ const syncStudentLeaveStatus = async (studentDoc) => {
     const approvedLeaves = await LeaveRequest.find({
       studentId: studentDoc._id,
       status: { $in: ['Approved', 'approved'] }
-    });
+    }).lean();
 
     let isOnLeaveToday = false;
 
@@ -35,7 +35,7 @@ const syncStudentLeaveStatus = async (studentDoc) => {
     const expectedStatus = isOnLeaveToday ? 'On Leave' : 'Active';
     if (studentDoc.status !== expectedStatus) {
       studentDoc.status = expectedStatus;
-      await studentDoc.save();
+      await Student.updateOne({ _id: studentDoc._id }, { status: expectedStatus });
     }
   } catch (err) {
     console.error('Error syncing student leave status:', err);
@@ -53,9 +53,9 @@ const getStudents = async (req, res) => {
 
     if (userRole === 'student') {
       // Students only see their own profile
-      let student = await Student.findOne({ userId: req.user._id }).populate('userId', 'name email profileImage');
+      let student = await Student.findOne({ userId: req.user._id }).populate('userId', 'name email profileImage').lean();
       if (!student) {
-        student = new Student({
+        const newStudent = new Student({
           userId: req.user._id,
           fullName: req.user.name || 'Student Resident',
           village: 'N/A',
@@ -70,13 +70,13 @@ const getStudents = async (req, res) => {
           roomNumber: 'Unassigned',
           status: 'Active'
         });
-        await student.save();
-        student = await Student.findById(student._id).populate('userId', 'name email profileImage');
+        await newStudent.save();
+        student = await Student.findById(newStudent._id).populate('userId', 'name email profileImage').lean();
       }
       return res.json([student]);
     }
 
-    const students = await Student.find(query).populate('userId', 'name email profileImage');
+    const students = await Student.find(query).populate('userId', 'name email profileImage').lean();
     for (const student of students) {
       await syncStudentLeaveStatus(student);
     }
@@ -91,7 +91,7 @@ const getStudents = async (req, res) => {
 // @access  Private (Student)
 const getMyStudentProfile = async (req, res) => {
   try {
-    let student = await Student.findOne({ userId: req.user._id }).populate('userId', 'name email profileImage');
+    let student = await Student.findOne({ userId: req.user._id }).populate('userId', 'name email profileImage').lean();
     if (!student) {
       return res.status(404).json({ message: 'Student profile not found' });
     }
@@ -107,7 +107,7 @@ const getMyStudentProfile = async (req, res) => {
 // @access  Private
 const getStudentById = async (req, res) => {
   try {
-    let student = await Student.findById(req.params.id).populate('userId', 'name email profileImage');
+    let student = await Student.findById(req.params.id).populate('userId', 'name email profileImage').lean();
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
     }
@@ -131,7 +131,7 @@ const createStudent = async (req, res) => {
     name, email, password,
     village, homeAddress, course, collegeName,
     otherCourseOrJob, joiningYear, joiningMonth,
-    mobile, parentsMobile, drivingLicense, roomNumber
+    mobile, parentsMobile, drivingLicense, drivingLicenseProofUrl, roomNumber
   } = req.body;
 
   try {
@@ -159,7 +159,7 @@ const createStudent = async (req, res) => {
       fullName: name,
       village, homeAddress, course, collegeName,
       otherCourseOrJob, joiningYear, joiningMonth,
-      mobile, parentsMobile, drivingLicense, roomNumber
+      mobile, parentsMobile, drivingLicense, drivingLicenseProofUrl, roomNumber
     });
 
     const createdStudent = await student.save();
@@ -197,6 +197,7 @@ const updateMyStudentProfile = async (req, res) => {
     if (req.body.mobile !== undefined) student.mobile = req.body.mobile;
     if (req.body.parentsMobile !== undefined) student.parentsMobile = req.body.parentsMobile;
     if (req.body.drivingLicense !== undefined) student.drivingLicense = req.body.drivingLicense;
+    if (req.body.drivingLicenseProofUrl !== undefined) student.drivingLicenseProofUrl = req.body.drivingLicenseProofUrl;
     if (req.body.roomNumber !== undefined) student.roomNumber = req.body.roomNumber;
     if (req.body.resultUrl !== undefined) student.resultUrl = req.body.resultUrl;
     if (req.body.resultDriveLink !== undefined) {
@@ -234,6 +235,7 @@ const updateStudent = async (req, res) => {
       if (req.body.mobile !== undefined) student.mobile = req.body.mobile;
       if (req.body.parentsMobile !== undefined) student.parentsMobile = req.body.parentsMobile;
       if (req.body.drivingLicense !== undefined) student.drivingLicense = req.body.drivingLicense;
+      if (req.body.drivingLicenseProofUrl !== undefined) student.drivingLicenseProofUrl = req.body.drivingLicenseProofUrl;
       if (req.body.roomNumber !== undefined) student.roomNumber = req.body.roomNumber;
       if (req.body.resultUrl !== undefined) student.resultUrl = req.body.resultUrl;
       if (req.body.resultDriveLink !== undefined) {

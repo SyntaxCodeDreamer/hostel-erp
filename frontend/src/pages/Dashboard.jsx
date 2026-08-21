@@ -33,6 +33,7 @@ const Dashboard = () => {
   const [data, setData] = useState(null);
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCourseIndex, setSelectedCourseIndex] = useState(null);
 
   const isDark = theme === 'dark';
 
@@ -122,7 +123,26 @@ const Dashboard = () => {
 
   const recentProgressList = (d.recentProgressItems || []).slice(0, 3);
 
-  const COURSE_COLORS = ['#818cf8', '#34d399', '#f43f5e', '#fbbf24', '#a78bfa'];
+  const DISTINCT_PALETTE = [
+    '#818cf8', '#34d399', '#f43f5e', '#fbbf24', '#a78bfa',
+    '#38bdf8', '#f97316', '#ec4899', '#10b981', '#06b6d4',
+    '#8b5cf6', '#eab308', '#ef4444', '#14b8a6', '#6366f1',
+    '#d946ef', '#f59e0b', '#84cc16', '#0284c7', '#7c3aed',
+    '#e11d48', '#059669', '#2563eb', '#9333ea', '#db2777',
+    '#ca8a04', '#16a34a', '#0891b2', '#4f46e5', '#475569'
+  ];
+
+  const getCourseColor = (index, total) => {
+    if (index < DISTINCT_PALETTE.length) {
+      return DISTINCT_PALETTE[index];
+    }
+    const hue = Math.round((index * 137.5) % 360);
+    return `hsl(${hue}, 80%, 60%)`;
+  };
+
+  const totalCourseStudents = coursePieData.reduce((acc, curr) => acc + (curr.value || 0), 0);
+  const activeCourse = selectedCourseIndex !== null && coursePieData[selectedCourseIndex] ? coursePieData[selectedCourseIndex] : null;
+
   const CHORE_COLORS = { 'Pending': '#10b981', 'In Progress': '#f59e0b', 'Completed': '#3b82f6' };
 
   const totalResidentsCount = d.totalStudents !== undefined ? d.totalStudents : 0;
@@ -234,43 +254,119 @@ const Dashboard = () => {
         {/* Chart 2: Course Enrollments */}
         <div className={`border rounded-2xl p-6 shadow-xs flex flex-col justify-between transition hover:shadow-md ${isDark ? 'bg-[#14161f] border-gray-800/80' : 'bg-white border-gray-200'}`}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className={`text-base font-bold tracking-wide ${isDark ? 'text-white' : 'text-gray-800'}`}>Course Enrollments</h3>
-            <Activity size={18} className="text-emerald-500" />
+            <div>
+              <h3 className={`text-base font-bold tracking-wide ${isDark ? 'text-white' : 'text-gray-800'}`}>Course Enrollments</h3>
+            </div>
+            {selectedCourseIndex !== null && (
+              <button
+                onClick={() => setSelectedCourseIndex(null)}
+                className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 border border-indigo-500/20 transition"
+              >
+                Reset Selection
+              </button>
+            )}
           </div>
+
           {coursePieData.length === 0 ? (
             <div className={`py-16 text-center text-xs font-medium border border-dashed rounded-xl ${isDark ? 'border-gray-800 text-gray-400' : 'border-gray-300 text-gray-500'}`}>
               No student course enrollment data available.
             </div>
           ) : (
             <>
-              <div style={{ width: '100%', height: 220, minHeight: 220 }} className="relative flex items-center justify-center">
+              {/* Interactive Donut with Center Statistical Overlay */}
+              <div style={{ width: '100%', height: 230, minHeight: 230 }} className="relative flex items-center justify-center">
+                
+                {/* Center Stats Display */}
+                {activeCourse ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-4 z-10">
+                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider truncate max-w-[150px]" title={activeCourse.name}>
+                      {activeCourse.name}
+                    </span>
+                    <span className="text-xl font-extrabold text-indigo-400 mt-0.5">
+                      {activeCourse.value} {activeCourse.value === 1 ? 'Resident' : 'Residents'}
+                    </span>
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 mt-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                      {activeCourse.value}/{totalCourseStudents} Total Enrolled
+                    </span>
+                  </div>
+                ) : (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-4 z-10">
+                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total Enrolled</span>
+                    <span className={`text-2xl font-extrabold ${isDark ? 'text-white' : 'text-gray-900'}`}>{totalCourseStudents}</span>
+                  </div>
+                )}
+
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={coursePieData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={6}
+                      innerRadius={65}
+                      outerRadius={85}
+                      paddingAngle={4}
                       dataKey="value"
                       stroke="none"
+                      cursor="pointer"
+                      onClick={(entry, idx) => setSelectedCourseIndex(selectedCourseIndex === idx ? null : idx)}
                     >
-                      {coursePieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COURSE_COLORS[index % COURSE_COLORS.length]} />
-                      ))}
+                      {coursePieData.map((entry, idx) => {
+                        const isSelected = selectedCourseIndex === idx;
+                        const color = getCourseColor(idx, coursePieData.length);
+                        return (
+                          <Cell
+                            key={`cell-${idx}`}
+                            fill={color}
+                            stroke={isSelected ? (isDark ? '#ffffff' : '#000000') : 'none'}
+                            strokeWidth={isSelected ? 3 : 0}
+                            opacity={selectedCourseIndex === null || isSelected ? 1 : 0.35}
+                          />
+                        );
+                      })}
                     </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: isDark ? '#1a1c26' : '#ffffff', borderColor: isDark ? '#374151' : '#e2e8f0', borderRadius: '12px', color: isDark ? '#ffffff' : '#0f172a' }} />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className={`p-3 rounded-xl shadow-lg border text-xs ${isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
+                              <p className="font-bold">{data.name}</p>
+                              <p className="text-indigo-400 font-semibold mt-1">{data.value} Residents</p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="flex flex-wrap justify-center gap-4 mt-2">
-                {coursePieData.map((item, index) => (
-                  <div key={item.name} className={`flex items-center gap-2 text-xs font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                    <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: COURSE_COLORS[index % COURSE_COLORS.length] }}></span>
-                    <span>{item.name}</span>
-                  </div>
-                ))}
+
+              {/* Interactive Legend Pills below with unique non-repeating colors */}
+              <div className="flex flex-wrap justify-center gap-2.5 mt-3 max-h-48 overflow-y-auto pr-1">
+                {coursePieData.map((item, idx) => {
+                  const isSelected = selectedCourseIndex === idx;
+                  const color = getCourseColor(idx, coursePieData.length);
+
+                  return (
+                    <button
+                      key={item.name}
+                      onClick={() => setSelectedCourseIndex(selectedCourseIndex === idx ? null : idx)}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition ${
+                        isSelected
+                          ? isDark
+                            ? 'bg-indigo-950/80 border-indigo-500 text-white shadow-sm ring-1 ring-indigo-500'
+                            : 'bg-indigo-50 border-indigo-400 text-indigo-900 shadow-sm ring-1 ring-indigo-400'
+                          : isDark
+                            ? 'bg-[#181a26] border-gray-800 text-gray-300 hover:bg-gray-800 hover:text-white'
+                            : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                      }`}
+                    >
+                      <span className="w-3 h-3 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: color }}></span>
+                      <span className="truncate max-w-[220px]">{item.name}</span>
+                    </button>
+                  );
+                })}
               </div>
             </>
           )}

@@ -229,10 +229,6 @@ const TrustLeader = () => {
                   <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Contact Number</label>
                   <input type="text" required value={leaderData.contactNumber} onChange={(e) => setLeaderData({...leaderData, contactNumber: e.target.value})} className={`w-full border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'}`} placeholder="Phone..." />
                 </div>
-                <div>
-                  <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Duration (Term)</label>
-                  <input type="text" required value={leaderData.duration} onChange={(e) => setLeaderData({...leaderData, duration: e.target.value})} className={`w-full border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'}`} placeholder="e.g. 2025 - 2026" />
-                </div>
               </div>
               <button 
                 type="submit" 
@@ -262,7 +258,9 @@ const TrustLeader = () => {
                 <th className={`p-4 font-semibold text-xs uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Name</th>
                 <th className={`p-4 font-semibold text-xs uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{activeTab === 'trust' ? 'Position' : 'Role'}</th>
                 <th className={`p-4 font-semibold text-xs uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Contact Number</th>
-                <th className={`p-4 font-semibold text-xs uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{activeTab === 'trust' ? 'Joining Date' : 'Duration'}</th>
+                {activeTab === 'trust' && (
+                  <th className={`p-4 font-semibold text-xs uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Joining Date</th>
+                )}
                 {isAdmin && <th className={`p-4 font-semibold text-xs uppercase tracking-wider text-center ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Action</th>}
               </tr>
             </thead>
@@ -314,7 +312,6 @@ const TrustLeader = () => {
                       </span>
                     </td>
                     <td className={`p-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{leader.contactNumber || 'N/A'}</td>
-                    <td className={`p-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{leader.duration || '2025-2026'}</td>
                     {isAdmin && (
                       <td className="p-4 text-center">
                         <button onClick={() => handleDeleteLeader(leader._id)} className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition p-1" title="Remove">
@@ -328,7 +325,7 @@ const TrustLeader = () => {
               
               {((activeTab === 'trust' && members.length === 0) || (activeTab === 'leader' && leaders.length === 0)) && (
                 <tr>
-                  <td colSpan={isAdmin ? 5 : 4} className={`p-8 text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <td colSpan={isAdmin ? (activeTab === 'trust' ? 5 : 4) : (activeTab === 'trust' ? 4 : 3)} className={`p-8 text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                     No {activeTab === 'trust' ? 'Trust Members' : 'Leaders'} registered yet.
                   </td>
                 </tr>
