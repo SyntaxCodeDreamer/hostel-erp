@@ -143,7 +143,7 @@ const createLeader = async (req, res) => {
       userId: user._id,
       role: assignedRole,
       contactNumber,
-      duration
+      duration: duration || ''
     });
 
     res.status(201).json(leaderProfile);

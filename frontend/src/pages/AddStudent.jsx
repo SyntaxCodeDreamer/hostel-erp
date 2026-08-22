@@ -128,7 +128,7 @@ const AddStudent = () => {
             <div className="grid grid-cols-1 gap-6">
               <div>
                 <label className={labelClass}>Village / City</label>
-                <input type="text" name="village" value={formData.village} onChange={handleChange} required className={inputClass} placeholder="Native place" />
+                <input type="text" name="village" value={formData.village} onChange={handleChange} required className={inputClass} placeholder="Enter Village / City..." />
               </div>
               <div>
                 <label className={labelClass}>Driving License</label>

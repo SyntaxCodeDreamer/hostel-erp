@@ -15,8 +15,8 @@ const leaderProfileSchema = new mongoose.Schema({
     required: true
   },
   duration: {
-    type: String, // e.g. "2023-2024"
-    required: true
+    type: String,
+    default: ''
   }
 }, {
   timestamps: true
