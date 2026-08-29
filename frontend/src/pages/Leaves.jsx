@@ -233,32 +233,32 @@ const Leaves = () => {
 
           {/* Pagination Controls Footer */}
           {filteredLeaves.length > 0 && (
-            <div className={`px-6 py-4 border-t flex flex-wrap items-center justify-between gap-4 text-xs ${
+            <div className={`px-4 py-3 sm:px-6 sm:py-4 border-t flex flex-col sm:flex-row items-center justify-between gap-3 text-xs ${
               isDark ? 'border-gray-800 text-gray-400 bg-[#14161f]' : 'border-gray-200 text-gray-600 bg-gray-50'
             }`}>
-              <div>
+              <div className="text-center sm:text-left">
                 Showing <span className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{startIndex + 1}</span> to{' '}
                 <span className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{Math.min(startIndex + itemsPerPage, filteredLeaves.length)}</span> of{' '}
                 <span className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{filteredLeaves.length}</span> leave requests
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center gap-1.5 w-full sm:w-auto max-w-full overflow-x-auto py-1">
                 <button
                   disabled={currentPage === 1}
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  className={`px-3 py-1.5 rounded-lg border font-medium transition disabled:opacity-40 disabled:cursor-not-allowed ${
+                  className={`px-2.5 sm:px-3 py-1.5 rounded-lg border font-medium transition shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
                     isDark ? 'border-gray-700 bg-[#1a1c26] text-white hover:bg-gray-800' : 'border-gray-300 bg-white text-gray-800 hover:bg-gray-100'
                   }`}
                 >
                   Previous
                 </button>
 
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 overflow-x-auto max-w-[170px] xs:max-w-[240px] sm:max-w-none shrink py-0.5 scrollbar-none">
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
                     <button
                       key={pageNum}
                       onClick={() => setCurrentPage(pageNum)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                      className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition shrink-0 ${
                         currentPage === pageNum
                           ? 'bg-indigo-600 text-white shadow-xs'
                           : isDark
@@ -274,7 +274,7 @@ const Leaves = () => {
                 <button
                   disabled={currentPage === totalPages}
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  className={`px-3 py-1.5 rounded-lg border font-medium transition disabled:opacity-40 disabled:cursor-not-allowed ${
+                  className={`px-2.5 sm:px-3 py-1.5 rounded-lg border font-medium transition shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
                     isDark ? 'border-gray-700 bg-[#1a1c26] text-white hover:bg-gray-800' : 'border-gray-300 bg-white text-gray-800 hover:bg-gray-100'
                   }`}
                 >

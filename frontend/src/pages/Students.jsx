@@ -281,8 +281,10 @@ const Students = () => {
   };
 
   const getStudentStatus = (student) => {
-    const raw = student.status || 'active';
-    return raw.charAt(0).toUpperCase() + raw.slice(1);
+    const raw = (student?.status || 'Active').toString();
+    if (raw.toLowerCase() === 'in-active' || raw.toLowerCase() === 'inactive' || raw.toLowerCase() === 'left') return 'In-Active';
+    if (raw.toLowerCase() === 'on leave') return 'On Leave';
+    return 'Active';
   };
 
   const filteredStudents = useMemo(() => {
@@ -995,32 +997,32 @@ const Students = () => {
 
             {/* Pagination Controls Footer */}
             {filteredStudents.length > 0 && (
-              <div className={`px-6 py-4 border-t flex flex-wrap items-center justify-between gap-4 text-xs ${
+              <div className={`px-4 py-3 sm:px-6 sm:py-4 border-t flex flex-col sm:flex-row items-center justify-between gap-3 text-xs ${
                 isDark ? 'bg-[#14161f] border-gray-800 text-gray-400' : 'bg-gray-50/90 border-gray-200 text-gray-600'
               }`}>
-                <div>
+                <div className="text-center sm:text-left">
                   Showing <span className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{startIndex + 1}</span> to{' '}
                   <span className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{Math.min(startIndex + itemsPerPage, filteredStudents.length)}</span> of{' '}
                   <span className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{filteredStudents.length}</span> students
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center gap-1.5 w-full sm:w-auto max-w-full overflow-x-auto py-1">
                   <button
                     disabled={currentPage === 1}
                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    className={`px-3 py-1.5 rounded-lg border transition font-medium disabled:opacity-40 disabled:cursor-not-allowed ${
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg border transition font-medium shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
                       isDark ? 'border-gray-700 bg-[#1a1c26] text-white hover:bg-gray-800' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100'
                     }`}
                   >
                     Previous
                   </button>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 overflow-x-auto max-w-[170px] xs:max-w-[240px] sm:max-w-none shrink py-0.5 scrollbar-none">
                     {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
                       <button
                         key={pageNum}
                         onClick={() => setCurrentPage(pageNum)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                        className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition shrink-0 ${
                           currentPage === pageNum
                             ? 'bg-indigo-600 text-white shadow-xs'
                             : isDark
@@ -1036,7 +1038,7 @@ const Students = () => {
                   <button
                     disabled={currentPage === totalPages}
                     onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    className={`px-3 py-1.5 rounded-lg border transition font-medium disabled:opacity-40 disabled:cursor-not-allowed ${
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg border transition font-medium shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
                       isDark ? 'border-gray-700 bg-[#1a1c26] text-white hover:bg-gray-800' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100'
                     }`}
                   >
@@ -1050,32 +1052,32 @@ const Students = () => {
       )}
       {/* FULL STUDENT PROFILE MODAL FOR ADMIN / LEADER */}
       {!isStudent && selectedStudent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
-          <div className={`rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border animate-in fade-in zoom-in duration-150 ${
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-xs">
+          <div className={`rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto border animate-in fade-in zoom-in duration-150 ${
             isDark ? 'bg-[#14161f] text-gray-100 border-gray-800' : 'bg-white text-gray-900 border-gray-200'
           }`}>
             
             {/* Modal Header */}
-            <div className="relative bg-gradient-to-r from-indigo-700 to-purple-800 text-white p-6 rounded-t-2xl flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="h-16 w-16 rounded-full bg-white/20 border-2 border-white flex items-center justify-center text-2xl font-bold">
+            <div className="relative bg-gradient-to-r from-indigo-700 to-purple-800 text-white p-4 sm:p-6 rounded-t-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center space-x-3 sm:space-x-4 min-w-0">
+                <div className="h-12 w-12 sm:h-16 sm:w-16 shrink-0 rounded-full bg-white/20 border-2 border-white flex items-center justify-center text-xl sm:text-2xl font-bold">
                   {getStudentName(selectedStudent).charAt(0).toUpperCase()}
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold">{getStudentName(selectedStudent)}</h2>
-                  <p className="text-indigo-200 text-sm">{getStudentEmail(selectedStudent)}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="bg-white/20 text-xs px-2.5 py-0.5 rounded-full font-medium">
+                <div className="min-w-0 break-words">
+                  <h2 className="text-lg sm:text-xl font-bold truncate">{getStudentName(selectedStudent)}</h2>
+                  <p className="text-indigo-200 text-xs sm:text-sm truncate">{getStudentEmail(selectedStudent)}</p>
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-1.5">
+                    <span className="bg-white/20 text-[11px] sm:text-xs px-2.5 py-0.5 rounded-full font-medium">
                       Room {selectedStudent.roomNumber || 'N/A'}
                     </span>
-                    <span className="bg-white/20 text-xs px-2.5 py-0.5 rounded-full font-medium">
+                    <span className="bg-white/20 text-[11px] sm:text-xs px-2.5 py-0.5 rounded-full font-medium">
                       Status: {getStudentStatus(selectedStudent)}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
                 {!isEditing && (isAdmin || isLeader) && (
                   <button
                     onClick={() => setIsEditing(true)}
@@ -1095,7 +1097,7 @@ const Students = () => {
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 space-y-6">
+            <div className="p-4 sm:p-6 space-y-6">
               {saveSuccess && (
                 <div className="p-3 bg-emerald-950/80 border border-emerald-700/60 text-emerald-300 text-xs font-semibold rounded-xl flex items-center gap-2">
                   <CheckCircle2 size={16} />
@@ -1105,19 +1107,19 @@ const Students = () => {
 
               {/* Status Selector Bar for Admin */}
               {isAdmin && !isEditing && (
-                <div className={`p-4 rounded-xl border flex flex-wrap items-center justify-between gap-3 ${
+                <div className={`p-3.5 sm:p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
                   isDark ? 'bg-[#1a1c26] border-gray-800' : 'bg-gray-50 border-gray-200'
                 }`}>
                   <div className="flex items-center gap-2">
-                    <ShieldCheck size={18} className="text-indigo-400" />
+                    <ShieldCheck size={18} className="text-indigo-400 shrink-0" />
                     <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Quick Status Action:</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                     {['Active', 'On Leave', 'In-Active'].map((st) => (
                       <button
                         key={st}
                         onClick={() => handleStatusChange(st)}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
+                        className={`flex-1 sm:flex-none px-3 py-1.5 text-xs font-semibold rounded-lg transition text-center ${
                           getStudentStatus(selectedStudent) === st
                             ? 'bg-indigo-600 text-white shadow-xs'
                             : isDark

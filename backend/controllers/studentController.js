@@ -9,6 +9,10 @@ const { sendPushNotification } = require('../utils/webPush');
 const syncStudentLeaveStatus = async (studentDoc) => {
   if (!studentDoc) return studentDoc;
   try {
+    const currentStatus = (studentDoc.status || '').toLowerCase();
+    if (currentStatus === 'in-active' || currentStatus === 'inactive' || currentStatus === 'left') {
+      return studentDoc;
+    }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 

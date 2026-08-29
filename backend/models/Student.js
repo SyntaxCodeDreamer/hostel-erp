@@ -34,7 +34,7 @@ const studentSchema = new mongoose.Schema({
   roomNumber: { type: String, required: true },
   status: {
     type: String,
-    enum: ['Active', 'On Leave', 'Left'],
+    enum: ['Active', 'On Leave', 'In-Active', 'Inactive', 'Left'],
     default: 'Active'
   },
   leaveCount: {
