@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import apiClient from '../utils/apiClient';
 import { useNavigate } from 'react-router-dom';
 import { ThemeContext } from '../context/ThemeContext';
@@ -7,17 +7,92 @@ const LeaveRequestForm = () => {
   const [formData, setFormData] = useState({
     reason: '',
     fromDate: '',
+    fromTime: '09:00',
     toDate: '',
+    toTime: '18:00',
+    requestedDays: '',
+    previousLeaveDays: '0',
     destination: '',
     emergencyContact: ''
   });
+  const [hasPreviousLeaves, setHasPreviousLeaves] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
   const { theme } = useContext(ThemeContext);
   const isDark = theme === 'dark';
 
+  useEffect(() => {
+    const fetchLeaveStats = async () => {
+      try {
+        const [{ data: myProfile }, { data: leaves }] = await Promise.all([
+          apiClient.get('/students/me').catch(() => ({ data: null })),
+          apiClient.get('/leaves').catch(() => ({ data: [] }))
+        ]);
+
+        if (Array.isArray(leaves)) {
+          const studentId = myProfile?._id;
+          const myLeaves = leaves.filter(l => 
+            (l.studentId?._id === studentId || l.studentId === studentId)
+          );
+
+          if (myLeaves.length > 0) {
+            setHasPreviousLeaves(true);
+          }
+
+          const approvedLeaves = myLeaves.filter(l => 
+            l.status === 'Approved' || l.status === 'approved'
+          );
+
+          let sumDays = 0;
+          let maxPrevEntered = 0;
+
+          approvedLeaves.forEach(l => {
+            if (l.requestedDays !== undefined && l.requestedDays !== null && l.requestedDays !== '') {
+              sumDays += Number(l.requestedDays);
+            } else if (l.fromDate && l.toDate) {
+              const f = new Date(l.fromDate);
+              const t = new Date(l.toDate);
+              if (!isNaN(f.getTime()) && !isNaN(t.getTime())) {
+                const diff = Math.abs(t - f);
+                sumDays += Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1;
+              }
+            }
+
+            if (l.previousLeaveDays !== undefined && l.previousLeaveDays !== null && l.previousLeaveDays !== '') {
+              const p = Number(l.previousLeaveDays);
+              if (p > maxPrevEntered) maxPrevEntered = p;
+            }
+          });
+
+          const totalTaken = sumDays + maxPrevEntered;
+          setFormData(prev => ({ ...prev, previousLeaveDays: totalTaken.toString() }));
+        }
+      } catch (err) {
+        console.error('Error fetching leave stats:', err);
+      }
+    };
+    fetchLeaveStats();
+  }, []);
+
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData(prev => {
+      const nextForm = { ...prev, [name]: value };
+      if (name === 'fromDate' || name === 'toDate') {
+        const from = name === 'fromDate' ? value : prev.fromDate;
+        const to = name === 'toDate' ? value : prev.toDate;
+        if (from && to) {
+          const f = new Date(from);
+          const t = new Date(to);
+          if (!isNaN(f.getTime()) && !isNaN(t.getTime())) {
+            const diff = Math.abs(t - f);
+            const calcDays = Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1;
+            nextForm.requestedDays = calcDays.toString();
+          }
+        }
+      }
+      return nextForm;
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -40,18 +115,74 @@ const LeaveRequestForm = () => {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Destination</label>
-          <input type="text" name="destination" value={formData.destination} onChange={handleChange} required className={`mt-1 block w-full rounded-xl shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2.5 border transition-colors ${isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`} />
+          <input type="text" name="destination" value={formData.destination} onChange={handleChange} required className={`mt-1 block w-full rounded-xl shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2.5 border transition-colors ${isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`} placeholder="Going to..." />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        
+        {/* Leaving Date & Time */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>From Date</label>
+            <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Leaving Date (From)</label>
             <input type="date" name="fromDate" value={formData.fromDate} onChange={handleChange} required className={`mt-1 block w-full rounded-xl shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2.5 border transition-colors ${isDark ? 'bg-[#1a1c26] border-gray-700 text-white [color-scheme:dark]' : 'bg-white border-gray-300 text-gray-900'}`} />
           </div>
           <div>
-            <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>To Date</label>
-            <input type="date" name="toDate" value={formData.toDate} onChange={handleChange} required className={`mt-1 block w-full rounded-xl shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2.5 border transition-colors ${isDark ? 'bg-[#1a1c26] border-gray-700 text-white [color-scheme:dark]' : 'bg-white border-gray-300 text-gray-900'}`} />
+            <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Leaving Time</label>
+            <input type="time" name="fromTime" value={formData.fromTime} onChange={handleChange} required className={`mt-1 block w-full rounded-xl shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2.5 border transition-colors ${isDark ? 'bg-[#1a1c26] border-gray-700 text-white [color-scheme:dark]' : 'bg-white border-gray-300 text-gray-900'}`} />
           </div>
         </div>
+
+        {/* Return Date & Time */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Return Date (To)</label>
+            <input type="date" name="toDate" value={formData.toDate} onChange={handleChange} required className={`mt-1 block w-full rounded-xl shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2.5 border transition-colors ${isDark ? 'bg-[#1a1c26] border-gray-700 text-white [color-scheme:dark]' : 'bg-white border-gray-300 text-gray-900'}`} />
+          </div>
+          <div>
+            <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Return Time</label>
+            <input type="time" name="toTime" value={formData.toTime} onChange={handleChange} required className={`mt-1 block w-full rounded-xl shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2.5 border transition-colors ${isDark ? 'bg-[#1a1c26] border-gray-700 text-white [color-scheme:dark]' : 'bg-white border-gray-300 text-gray-900'}`} />
+          </div>
+        </div>
+
+        {/* Leave Duration & Past Leaves Input Fields */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Requested Leave Duration (Days)</label>
+            <input 
+              type="number" 
+              name="requestedDays" 
+              min="1"
+              value={formData.requestedDays} 
+              onChange={handleChange} 
+              required
+              placeholder="Enter number of days..."
+              className={`mt-1 block w-full rounded-xl shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2.5 border transition-colors font-semibold ${
+                isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+              }`} 
+            />
+          </div>
+          <div>
+            <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Leave Days Already Taken</label>
+            <input 
+              type="number" 
+              name="previousLeaveDays" 
+              min="0"
+              value={formData.previousLeaveDays} 
+              onChange={handleChange} 
+              disabled={hasPreviousLeaves}
+              readOnly={hasPreviousLeaves}
+              required
+              placeholder="Enter leave days already taken..."
+              className={`mt-1 block w-full rounded-xl shadow-sm sm:text-sm p-2.5 border transition-colors font-semibold ${
+                hasPreviousLeaves
+                  ? isDark ? 'bg-gray-800/80 border-gray-700 text-gray-400 cursor-not-allowed' : 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed'
+                  : isDark ? 'bg-[#1a1c26] border-gray-700 text-white focus:border-indigo-500 focus:ring-indigo-500' : 'bg-white border-gray-300 text-gray-900 focus:border-indigo-500 focus:ring-indigo-500'
+              }`} 
+            />
+            {hasPreviousLeaves && (
+              <p className="text-[11px] text-gray-500 mt-1">Locked: Auto-calculated from your previously recorded leave history.</p>
+            )}
+          </div>
+        </div>
+
         <div>
           <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Emergency Contact Name & Mobile</label>
           <input type="text" name="emergencyContact" value={formData.emergencyContact} onChange={handleChange} required className={`mt-1 block w-full rounded-xl shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2.5 border transition-colors ${isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`} />

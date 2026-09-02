@@ -189,9 +189,19 @@ const Leaves = () => {
                         {leave.remarks && <div className="text-xs text-indigo-600 dark:text-indigo-400 mt-1">Remarks: {leave.remarks}</div>}
                       </td>
                       <td className={`px-6 py-4 whitespace-nowrap text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                        <div>{formatDate(leave.fromDate)} — {formatDate(leave.toDate)}</div>
-                        <div className="mt-1.5 inline-flex items-center gap-1 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 px-2.5 py-0.5 rounded-full text-[11px] font-bold">
-                          {calculateLeaveDays(leave.fromDate, leave.toDate)} {calculateLeaveDays(leave.fromDate, leave.toDate) === 1 ? 'Day' : 'Days'} Leave
+                        <div>
+                          <div><span className="font-semibold text-indigo-500">Out:</span> {formatDate(leave.fromDate)} {leave.fromTime ? `@ ${leave.fromTime}` : ''}</div>
+                          <div><span className="font-semibold text-emerald-500">In:</span> {formatDate(leave.toDate)} {leave.toTime ? `@ ${leave.toTime}` : ''}</div>
+                        </div>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 px-2.5 py-0.5 rounded-full text-[11px] font-bold">
+                            {leave.requestedDays !== undefined && leave.requestedDays !== null && leave.requestedDays !== '' ? leave.requestedDays : calculateLeaveDays(leave.fromDate, leave.toDate)} {(Number(leave.requestedDays || calculateLeaveDays(leave.fromDate, leave.toDate))) === 1 ? 'Day' : 'Days'} Requested
+                          </span>
+                          {leave.previousLeaveDays !== undefined && leave.previousLeaveDays !== null && leave.previousLeaveDays !== '' && (
+                            <span className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full text-[11px] font-semibold">
+                              {leave.previousLeaveDays} {Number(leave.previousLeaveDays) === 1 ? 'Day' : 'Days'} Prev. Taken
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

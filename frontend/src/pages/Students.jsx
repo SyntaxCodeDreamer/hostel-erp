@@ -101,26 +101,39 @@ const Students = () => {
 
   const calculateStudentTotalLeaveDays = (student) => {
     if (!student) return 0;
-    const studentId = (student._id || student.id || '').toString();
-    const approved = (Array.isArray(leavesList) ? leavesList : []).filter(l => {
-      const sId = l.studentId?._id ? l.studentId._id.toString() : (l.studentId || '').toString();
-      const statusLower = (l.status || '').toLowerCase();
-      return sId === studentId && statusLower === 'approved';
+    const studentIdStr = (student._id || student.id || '').toString();
+
+    const studentLeaves = (Array.isArray(leavesList) ? leavesList : []).filter(l => {
+      const lStudentId = (l.studentId?._id || l.studentId || '').toString();
+      return lStudentId === studentIdStr && (l.status === 'Approved' || l.status === 'approved');
     });
 
-    let totalDays = 0;
-    approved.forEach(l => {
-      if (l.fromDate && l.toDate) {
-        const from = new Date(l.fromDate);
-        const to = new Date(l.toDate);
-        if (!isNaN(from.getTime()) && !isNaN(to.getTime())) {
-          const diffTime = Math.abs(to - from);
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-          totalDays += diffDays;
+    let sumDays = 0;
+    let maxPreviousDays = 0;
+
+    studentLeaves.forEach(l => {
+      if (l.requestedDays !== undefined && l.requestedDays !== null && l.requestedDays !== '') {
+        sumDays += Number(l.requestedDays);
+      } else if (l.fromDate && l.toDate) {
+        const f = new Date(l.fromDate);
+        const t = new Date(l.toDate);
+        if (!isNaN(f.getTime()) && !isNaN(t.getTime())) {
+          const diff = Math.abs(t - f);
+          sumDays += Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1;
+        }
+      }
+
+      if (l.previousLeaveDays !== undefined && l.previousLeaveDays !== null && l.previousLeaveDays !== '') {
+        const prev = Number(l.previousLeaveDays);
+        if (prev > maxPreviousDays) {
+          maxPreviousDays = prev;
         }
       }
     });
-    return totalDays;
+
+    const profileLeaveCount = Number(student.leaveCount || student.previousLeaveDays || 0);
+
+    return sumDays + Math.max(maxPreviousDays, profileLeaveCount);
   };
 
   const handleDeleteStudent = async (studentId) => {
@@ -155,17 +168,33 @@ const Students = () => {
     }
   };
 
+  const [totalStudentsCount, setTotalStudentsCount] = useState(0);
+
   useEffect(() => {
-    fetchStudents();
-  }, []);
+    fetchStudents(currentPage, searchQuery);
+  }, [currentPage, searchQuery]);
 
-  const fetchStudents = async () => {
+  const fetchStudents = async (page = currentPage, search = searchQuery) => {
     try {
-      const { data } = await apiClient.get('/students');
-      const studentArr = Array.isArray(data) ? data : [];
-      setStudents(studentArr);
+      const [{ data: studentRes }, { data: leavesData }] = await Promise.all([
+        apiClient.get('/students', { params: { page, limit: itemsPerPage, search } }),
+        apiClient.get('/leaves').catch(() => ({ data: [] }))
+      ]);
 
-      const { data: leavesData } = await apiClient.get('/leaves').catch(() => ({ data: [] }));
+      let studentArr = [];
+      if (studentRes && Array.isArray(studentRes.students)) {
+        studentArr = studentRes.students;
+        setStudents(studentArr);
+        setTotalStudentsCount(studentRes.total || studentArr.length);
+      } else if (Array.isArray(studentRes)) {
+        studentArr = studentRes;
+        setStudents(studentArr);
+        setTotalStudentsCount(studentArr.length);
+      } else {
+        setStudents([]);
+        setTotalStudentsCount(0);
+      }
+
       if (Array.isArray(leavesData)) {
         setLeavesList(leavesData);
       }
@@ -200,20 +229,16 @@ const Students = () => {
     });
 
     try {
-      const { data: fullStudent } = await apiClient.get(`/students/${student._id}`).catch(() => ({ data: student }));
-      if (fullStudent && fullStudent._id) {
-        setSelectedStudent(fullStudent);
+      const currentLeaves = leavesList.length > 0 ? leavesList : (await apiClient.get('/leaves').catch(() => ({ data: [] }))).data || [];
+      if (Array.isArray(currentLeaves) && leavesList.length === 0) {
+        setLeavesList(currentLeaves);
       }
-
-      const { data: leaves } = await apiClient.get('/leaves').catch(() => ({ data: [] }));
-      const leaveArr = Array.isArray(leaves) ? leaves : [];
-      setLeavesList(leaveArr);
-      const approvedCount = leaveArr.filter(
+      const approvedCount = (Array.isArray(currentLeaves) ? currentLeaves : []).filter(
         (l) => (l.studentId?._id === student._id || l.studentId === student._id) && (l.status === 'Approved' || l.status === 'approved')
       ).length;
       setStudentLeaveCount(approvedCount);
     } catch (err) {
-      console.error('Error fetching student leave stats:', err);
+      console.error('Error calculating student leave stats:', err);
     }
   };
 
@@ -281,51 +306,48 @@ const Students = () => {
   };
 
   const getStudentStatus = (student) => {
-    const raw = (student?.status || 'Active').toString();
+    const raw = (student?.status || 'Available').toString();
     if (raw.toLowerCase() === 'in-active' || raw.toLowerCase() === 'inactive' || raw.toLowerCase() === 'left') return 'In-Active';
     if (raw.toLowerCase() === 'on leave') return 'On Leave';
-    return 'Active';
+    return 'Available';
   };
 
-  const filteredStudents = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
-    if (!q) return students;
-    return students.filter((student) => {
-      const name = getStudentName(student).toLowerCase();
-      const email = getStudentEmail(student).toLowerCase();
-      const course = (student.course || '').toLowerCase();
-      const room = (student.roomNumber || '').toLowerCase();
-      return name.includes(q) || email.includes(q) || course.includes(q) || room.includes(q);
-    });
-  }, [students, searchQuery]);
 
-  const totalPages = Math.ceil(filteredStudents.length / itemsPerPage) || 1;
+
+  const filteredStudents = students;
+  const totalPages = Math.ceil(totalStudentsCount / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedStudents = filteredStudents.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedStudents = students;
 
-  const exportStudentsToExcel = () => {
-    if (!students || students.length === 0) return;
+  const exportStudentsToExcel = async () => {
+    try {
+      const { data: fullRes } = await apiClient.get('/students');
+      const allStudents = Array.isArray(fullRes) ? fullRes : (fullRes.students || []);
+      if (!allStudents || allStudents.length === 0) return;
 
-    const data = students.map((s, idx) => ({
-      '#': idx + 1,
-      'Name': getStudentName(s),
-      'Email': getStudentEmail(s),
-      'Status': getStudentStatus(s),
-      'Mobile': s.mobile || s.mobileNumber || '',
-      'Parents Mobile': s.parentsMobile || s.parentMobile || '',
-      'Room Number': s.roomNumber || 'Unassigned',
-      'Course': s.course || '',
-      'College Name': s.collegeName || '',
-      'Village / Town': s.village || '',
-      'Driving License': s.drivingLicense ? 'Yes' : 'No',
-      'Home Address': s.homeAddress || '',
-      'Other Course / Job': s.otherCourseOrJob || ''
-    }));
+      const data = allStudents.map((s, idx) => ({
+        '#': idx + 1,
+        'Name': getStudentName(s),
+        'Email': getStudentEmail(s),
+        'Status': getStudentStatus(s),
+        'Mobile': s.mobile || s.mobileNumber || '',
+        'Parents Mobile': s.parentsMobile || s.parentMobile || '',
+        'Room Number': s.roomNumber || 'Unassigned',
+        'Course': s.course || '',
+        'College Name': s.collegeName || '',
+        'Village / Town': s.village || '',
+        'Driving License': s.drivingLicense ? 'Yes' : 'No',
+        'Home Address': s.homeAddress || '',
+        'Other Course / Job': s.otherCourseOrJob || ''
+      }));
 
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Students Directory');
-    XLSX.writeFile(wb, `Hostel_Students_Directory_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Students Directory');
+      XLSX.writeFile(wb, `Hostel_Students_Directory_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (err) {
+      console.error('Error exporting students:', err);
+    }
   };
 
   const handleImportExcel = (e) => {
@@ -587,46 +609,50 @@ const Students = () => {
                 <>
                   {/* Grid 1: Academic & Course */}
                   <div>
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                      <GraduationCap size={16} className="text-indigo-400" /> Academic Information
+                    <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5 ${isDark ? 'text-gray-400' : 'text-slate-900'}`}>
+                      <GraduationCap size={16} className={isDark ? "text-indigo-400" : "text-indigo-600"} /> Academic Information
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-[#1a1c26] p-4 rounded-xl border border-gray-800">
+                    <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl border ${
+                      isDark ? 'bg-[#1a1c26] border-gray-800' : 'bg-slate-100/80 border-slate-300 shadow-xs'
+                    }`}>
                       <div>
-                        <p className="text-xs text-gray-400 font-medium">Enrolled Course</p>
-                        <p className="text-sm font-semibold text-white">{selectedStudent.course || 'N/A'}</p>
+                        <p className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>Enrolled Course</p>
+                        <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>{selectedStudent.course || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-400 font-medium">College / Institute</p>
-                        <p className="text-sm font-semibold text-white">{selectedStudent.collegeName || 'N/A'}</p>
+                        <p className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>College / Institute</p>
+                        <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>{selectedStudent.collegeName || 'N/A'}</p>
                       </div>
                       {(selectedStudent.otherCourseOrJob || selectedStudent.otherCourseOrJobPlace) && (
                         <div className="sm:col-span-2">
-                          <p className="text-xs text-gray-400 font-medium">Other Course / Job Details</p>
-                          <p className="text-sm font-semibold text-white">{selectedStudent.otherCourseOrJob || selectedStudent.otherCourseOrJobPlace}</p>
+                          <p className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>Other Course / Job Details</p>
+                          <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>{selectedStudent.otherCourseOrJob || selectedStudent.otherCourseOrJobPlace}</p>
                         </div>
                       )}
                       {(selectedStudent.resultDriveLink || selectedStudent.resultUrl || (selectedStudent.resultUrls && selectedStudent.resultUrls.length > 0)) && (
                         <div className="sm:col-span-2">
-                          <p className="text-xs text-gray-400 font-medium mb-2 flex items-center gap-1.5">
-                            <LinkIcon size={14} className="text-indigo-400" /> Exam Results Drive Link
+                          <p className={`text-xs font-semibold mb-2 flex items-center gap-1.5 ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>
+                            <LinkIcon size={14} className={isDark ? "text-indigo-400" : "text-indigo-600"} /> Exam Results Drive Link
                           </p>
                           <a 
                             href={selectedStudent.resultDriveLink || selectedStudent.resultUrl || selectedStudent.resultUrls?.[0]} 
                             target="_blank" 
                             rel="noopener noreferrer" 
-                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 border border-indigo-500/30 rounded-xl text-xs font-bold transition"
+                            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition border ${
+                              isDark ? 'bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 border-indigo-500/30' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-300'
+                            }`}
                           >
                             <ExternalLink size={16} /> Open Results in Google Drive
                           </a>
                         </div>
                       )}
                       <div>
-                        <p className="text-xs text-gray-400 font-medium">Joining Date</p>
-                        <p className="text-sm font-semibold text-white">{selectedStudent.joiningMonth || 'August'} {selectedStudent.joiningYear || 2024}</p>
+                        <p className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>Joining Date</p>
+                        <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>{selectedStudent.joiningMonth || 'August'} {selectedStudent.joiningYear || 2024}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-400 font-medium">Total Approved Leave Days</p>
-                        <p className="text-sm font-semibold text-indigo-400">
+                        <p className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>Total Approved Leave Days</p>
+                        <p className={`text-sm font-extrabold ${isDark ? 'text-indigo-400' : 'text-indigo-700'}`}>
                           {calculateStudentTotalLeaveDays(selectedStudent)} Days
                         </p>
                       </div>
@@ -635,48 +661,52 @@ const Students = () => {
 
                   {/* Grid 2: Contact Information */}
                   <div>
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                      <Phone size={16} className="text-indigo-400" /> Contact Details
+                    <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5 ${isDark ? 'text-gray-400' : 'text-slate-900'}`}>
+                      <Phone size={16} className={isDark ? "text-indigo-400" : "text-indigo-600"} /> Contact Details
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-[#1a1c26] p-4 rounded-xl border border-gray-800">
+                    <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl border ${
+                      isDark ? 'bg-[#1a1c26] border-gray-800' : 'bg-slate-100/80 border-slate-300 shadow-xs'
+                    }`}>
                       <div>
-                        <p className="text-xs text-gray-400 font-medium">Student Mobile Number</p>
-                        <p className="text-sm font-semibold text-white">{selectedStudent.mobile || selectedStudent.mobileNumber || 'N/A'}</p>
+                        <p className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>Student Mobile Number</p>
+                        <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>{selectedStudent.mobile || selectedStudent.mobileNumber || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-400 font-medium">Parents / Emergency Mobile</p>
-                        <p className="text-sm font-semibold text-white">{selectedStudent.parentsMobile || selectedStudent.parentsMobileNumber || 'N/A'}</p>
+                        <p className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>Parents / Emergency Mobile</p>
+                        <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>{selectedStudent.parentsMobile || selectedStudent.parentsMobileNumber || 'N/A'}</p>
                       </div>
                     </div>
                   </div>
 
                   {/* Grid 3: Address & Location */}
                   <div>
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                      <MapPin size={16} className="text-indigo-400" /> Address & Location
+                    <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5 ${isDark ? 'text-gray-400' : 'text-slate-900'}`}>
+                      <MapPin size={16} className={isDark ? "text-indigo-400" : "text-indigo-600"} /> Address & Location
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-[#1a1c26] p-4 rounded-xl border border-gray-800">
+                    <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl border ${
+                      isDark ? 'bg-[#1a1c26] border-gray-800' : 'bg-slate-100/80 border-slate-300 shadow-xs'
+                    }`}>
                       <div>
-                        <p className="text-xs text-gray-400 font-medium">Native Village / Town</p>
-                        <p className="text-sm font-semibold text-white">{selectedStudent.village || 'N/A'}</p>
+                        <p className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>Native Village / Town</p>
+                        <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>{selectedStudent.village || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-400 font-medium">Driving License</p>
-                        <p className="text-sm font-semibold text-white">
+                        <p className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>Driving License</p>
+                        <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>
                           {selectedStudent.drivingLicense ? 'Yes (Available)' : 'No'}
                         </p>
                       </div>
                       <div className="sm:col-span-2">
-                        <p className="text-xs text-gray-400 font-medium">Full Home Address</p>
-                        <p className="text-sm font-semibold text-white">{selectedStudent.homeAddress || 'N/A'}</p>
+                        <p className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>Full Home Address</p>
+                        <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>{selectedStudent.homeAddress || 'N/A'}</p>
                       </div>
                     </div>
                   </div>
 
                   {/* Grid 4: Custom Yearly Progress & Accomplishments Section */}
-                  <div className="pt-2 border-t border-gray-800/80 mt-2">
+                  <div className={`pt-2 border-t mt-2 ${isDark ? 'border-gray-800/80' : 'border-gray-200'}`}>
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <h3 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                         <Award size={16} className="text-indigo-400" /> Yearly Overall Progress & Accomplishments
                       </h3>
                       <button
@@ -689,7 +719,9 @@ const Students = () => {
 
                     {/* Progress Creation Form */}
                     {showProgressForm && (
-                      <form onSubmit={handleAddProgress} className="bg-[#141622] p-4 rounded-xl border border-indigo-500/30 mb-4 space-y-4 shadow-lg">
+                      <form onSubmit={handleAddProgress} className={`p-4 rounded-xl border mb-4 space-y-4 shadow-lg ${
+                        isDark ? 'bg-[#141622] border-indigo-500/30' : 'bg-indigo-50/50 border-indigo-200'
+                      }`}>
                         <h4 className="text-xs font-bold text-indigo-400 uppercase flex items-center gap-1">
                           <TrendingUp size={14} /> Add New Progress Record
                         </h4>
@@ -702,11 +734,13 @@ const Students = () => {
                         
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Category *</label>
+                            <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Category *</label>
                             <select
                               value={progressData.category}
                               onChange={(e) => setProgressData({ ...progressData, category: e.target.value })}
-                              className="w-full bg-[#1a1c26] border border-gray-700 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                              className={`w-full border rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500 ${
+                                isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                              }`}
                             >
                               <option value="Academic">Academic 📚</option>
                               <option value="Extracurricular">Extracurricular 🎨</option>
@@ -717,58 +751,68 @@ const Students = () => {
                             </select>
                           </div>
                           <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Title *</label>
+                            <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Title *</label>
                             <input
                               type="text"
                               required
                               value={progressData.title}
                               onChange={(e) => setProgressData({ ...progressData, title: e.target.value })}
                               placeholder="e.g. 1st Rank in Semester 4 / AWS Certified"
-                              className="w-full bg-[#1a1c26] border border-gray-700 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                              className={`w-full border rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500 ${
+                                isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                              }`}
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Description</label>
+                          <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Description</label>
                           <textarea
                             rows="2"
                             value={progressData.description}
                             onChange={(e) => setProgressData({ ...progressData, description: e.target.value })}
                             placeholder="Detailed description of achievement or overall progress during the year..."
-                            className="w-full bg-[#1a1c26] border border-gray-700 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                            className={`w-full border rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500 ${
+                              isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                            }`}
                           />
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                           <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Remarks</label>
+                            <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Remarks</label>
                             <input
                               type="text"
                               value={progressData.remarks}
                               onChange={(e) => setProgressData({ ...progressData, remarks: e.target.value })}
                               placeholder="Special remarks or feedback"
-                              className="w-full bg-[#1a1c26] border border-gray-700 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                              className={`w-full border rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500 ${
+                                isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                              }`}
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Proof / Drive Link</label>
+                            <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Proof / Drive Link</label>
                             <input
                               type="url"
                               value={progressData.proofLink}
                               onChange={(e) => setProgressData({ ...progressData, proofLink: e.target.value })}
                               placeholder="https://drive.google.com/..."
-                              className="w-full bg-[#1a1c26] border border-gray-700 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                              className={`w-full border rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500 ${
+                                isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                              }`}
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Other Details</label>
+                            <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Other Details</label>
                             <input
                               type="text"
                               value={progressData.other}
                               onChange={(e) => setProgressData({ ...progressData, other: e.target.value })}
                               placeholder="Additional custom notes"
-                              className="w-full bg-[#1a1c26] border border-gray-700 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                              className={`w-full border rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500 ${
+                                isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                              }`}
                             />
                           </div>
                         </div>
@@ -777,7 +821,9 @@ const Students = () => {
                           <button
                             type="button"
                             onClick={() => setShowProgressForm(false)}
-                            className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-semibold rounded-lg transition"
+                            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
+                              isDark ? 'bg-gray-800 hover:bg-gray-700 text-gray-300' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                            }`}
                           >
                             Cancel
                           </button>
@@ -805,7 +851,9 @@ const Students = () => {
                         {selectedStudent.progressItems.map((item) => (
                           <div
                             key={item._id}
-                            className="bg-[#1a1c26] border border-gray-800 rounded-xl p-4 flex flex-col justify-between relative group hover:border-indigo-500/50 transition shadow-sm"
+                            className={`border rounded-xl p-4 flex flex-col justify-between relative group transition shadow-sm ${
+                              isDark ? 'bg-[#1a1c26] border-gray-800 hover:border-indigo-500/50' : 'bg-gray-50 border-gray-200 hover:border-indigo-400'
+                            }`}
                           >
                             <div>
                               <div className="flex items-center justify-between mb-2">
@@ -814,39 +862,41 @@ const Students = () => {
                                 </span>
                                 <button
                                   onClick={() => handleDeleteProgress(item._id)}
-                                  className="text-gray-500 hover:text-red-400 p-1 rounded-md transition"
+                                  className="text-gray-400 hover:text-red-500 p-1 rounded-md transition"
                                   title="Delete Progress Record"
                                 >
                                   <Trash2 size={14} />
                                 </button>
                               </div>
 
-                              <h4 className="text-sm font-bold text-white mb-1">{item.title}</h4>
+                              <h4 className={`text-sm font-bold mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>{item.title}</h4>
 
                               {item.description && (
-                                <p className="text-xs text-gray-300 mb-2 leading-relaxed">{item.description}</p>
+                                <p className={`text-xs mb-2 leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{item.description}</p>
                               )}
 
                               {item.remarks && (
-                                <div className="bg-[#141620] p-2 rounded-lg border border-gray-800 text-[11px] text-gray-400 mb-2">
-                                  <span className="font-semibold text-indigo-400">Remarks: </span>{item.remarks}
+                                <div className={`p-2 rounded-lg border text-[11px] mb-2 ${
+                                  isDark ? 'bg-[#141620] border-gray-800 text-gray-400' : 'bg-white border-gray-200 text-gray-600'
+                                }`}>
+                                  <span className="font-semibold text-indigo-500">Remarks: </span>{item.remarks}
                                 </div>
                               )}
 
                               {item.other && (
-                                <div className="text-[11px] text-gray-400 mb-2">
-                                  <span className="font-semibold text-gray-300">Other: </span>{item.other}
+                                <div className={`text-[11px] mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                                  <span className={`font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Other: </span>{item.other}
                                 </div>
                               )}
                             </div>
 
                             {item.proofLink && (
-                              <div className="pt-2 border-t border-gray-800/80 mt-2">
+                              <div className={`pt-2 border-t mt-2 ${isDark ? 'border-gray-800/80' : 'border-gray-200'}`}>
                                 <a
                                   href={item.proofLink}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 font-semibold transition"
+                                  className="inline-flex items-center gap-1.5 text-xs text-indigo-500 hover:text-indigo-600 font-semibold transition"
                                 >
                                   <ExternalLink size={13} /> View Proof / Link
                                 </a>
@@ -856,7 +906,9 @@ const Students = () => {
                         ))}
                       </div>
                     ) : (
-                      <div className="bg-[#1a1c26] border border-gray-800 rounded-xl p-6 text-center text-xs text-gray-500">
+                      <div className={`border rounded-xl p-6 text-center text-xs ${
+                        isDark ? 'bg-[#1a1c26] border-gray-800 text-gray-400' : 'bg-gray-50 border-gray-200 text-gray-500'
+                      }`}>
                         No progress records added yet. Click "Add Progress Record" above to add overall achievements.
                       </div>
                     )}
@@ -944,7 +996,7 @@ const Students = () => {
                         <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{sMobile}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2.5 py-1 inline-flex text-xs font-semibold rounded-full ${
-                            sStatus === 'Active' 
+                            sStatus === 'Available' || sStatus === 'Active' 
                               ? isDark ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/50' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                               : sStatus === 'On Leave' || sStatus === 'On leave'
                               ? isDark ? 'bg-amber-950/80 text-amber-400 border border-amber-800/50' : 'bg-amber-100 text-amber-800 border border-amber-200'
@@ -1001,9 +1053,9 @@ const Students = () => {
                 isDark ? 'bg-[#14161f] border-gray-800 text-gray-400' : 'bg-gray-50/90 border-gray-200 text-gray-600'
               }`}>
                 <div className="text-center sm:text-left">
-                  Showing <span className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{startIndex + 1}</span> to{' '}
-                  <span className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{Math.min(startIndex + itemsPerPage, filteredStudents.length)}</span> of{' '}
-                  <span className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{filteredStudents.length}</span> students
+                  Showing <span className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{totalStudentsCount === 0 ? 0 : startIndex + 1}</span> to{' '}
+                  <span className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{Math.min(startIndex + itemsPerPage, totalStudentsCount)}</span> of{' '}
+                  <span className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{totalStudentsCount}</span> students
                 </div>
 
                 <div className="flex items-center justify-center gap-1.5 w-full sm:w-auto max-w-full overflow-x-auto py-1">
@@ -1115,19 +1167,19 @@ const Students = () => {
                     <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Quick Status Action:</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                    {['Active', 'On Leave', 'In-Active'].map((st) => (
+                    {[{ key: 'Active', label: 'Available' }, { key: 'On Leave', label: 'On Leave' }, { key: 'In-Active', label: 'In-Active' }].map((st) => (
                       <button
-                        key={st}
-                        onClick={() => handleStatusChange(st)}
+                        key={st.key}
+                        onClick={() => handleStatusChange(st.key)}
                         className={`flex-1 sm:flex-none px-3 py-1.5 text-xs font-semibold rounded-lg transition text-center ${
-                          getStudentStatus(selectedStudent) === st
+                          getStudentStatus(selectedStudent) === st.label
                             ? 'bg-indigo-600 text-white shadow-xs'
                             : isDark
                             ? 'bg-[#222533] border border-gray-700 text-gray-300 hover:bg-gray-800'
                             : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100'
                         }`}
                       >
-                        Set {st}
+                        Set {st.label}
                       </button>
                     ))}
                   </div>
@@ -1278,46 +1330,50 @@ const Students = () => {
                 <>
                   {/* Grid 1: Academic & Course */}
                   <div>
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                      <GraduationCap size={16} className="text-indigo-400" /> Academic Information
+                    <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5 ${isDark ? 'text-gray-400' : 'text-slate-900'}`}>
+                      <GraduationCap size={16} className={isDark ? "text-indigo-400" : "text-indigo-600"} /> Academic Information
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-[#1a1c26] p-4 rounded-xl border border-gray-800">
+                    <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl border ${
+                      isDark ? 'bg-[#1a1c26] border-gray-800' : 'bg-slate-100/80 border-slate-300 shadow-xs'
+                    }`}>
                       <div>
-                        <p className="text-xs text-gray-400 font-medium">Enrolled Course</p>
-                        <p className="text-sm font-semibold text-white">{selectedStudent.course || 'N/A'}</p>
+                        <p className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>Enrolled Course</p>
+                        <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>{selectedStudent.course || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-400 font-medium">College / Institute</p>
-                        <p className="text-sm font-semibold text-white">{selectedStudent.collegeName || 'N/A'}</p>
+                        <p className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>College / Institute</p>
+                        <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>{selectedStudent.collegeName || 'N/A'}</p>
                       </div>
                       {(selectedStudent.otherCourseOrJob || selectedStudent.otherCourseOrJobPlace) && (
                         <div className="sm:col-span-2">
-                          <p className="text-xs text-gray-400 font-medium">Other Course / Job Details</p>
-                          <p className="text-sm font-semibold text-white">{selectedStudent.otherCourseOrJob || selectedStudent.otherCourseOrJobPlace}</p>
+                          <p className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>Other Course / Job Details</p>
+                          <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>{selectedStudent.otherCourseOrJob || selectedStudent.otherCourseOrJobPlace}</p>
                         </div>
                       )}
                       {(selectedStudent.resultDriveLink || selectedStudent.resultUrl || (selectedStudent.resultUrls && selectedStudent.resultUrls.length > 0)) && (
                         <div className="sm:col-span-2">
-                          <p className="text-xs text-gray-400 font-medium mb-2 flex items-center gap-1.5">
-                            <LinkIcon size={14} className="text-indigo-400" /> Exam Results Drive Link
+                          <p className={`text-xs font-semibold mb-2 flex items-center gap-1.5 ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>
+                            <LinkIcon size={14} className={isDark ? "text-indigo-400" : "text-indigo-600"} /> Exam Results Drive Link
                           </p>
                           <a 
                             href={selectedStudent.resultDriveLink || selectedStudent.resultUrl || selectedStudent.resultUrls?.[0]} 
                             target="_blank" 
                             rel="noopener noreferrer" 
-                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 border border-indigo-500/30 rounded-xl text-xs font-bold transition"
+                            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition border ${
+                              isDark ? 'bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 border-indigo-500/30' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-300'
+                            }`}
                           >
                             <ExternalLink size={16} /> Open Results in Google Drive
                           </a>
                         </div>
                       )}
                       <div>
-                        <p className="text-xs text-gray-400 font-medium">Joining Date</p>
-                        <p className="text-sm font-semibold text-white">{selectedStudent.joiningMonth || 'August'} {selectedStudent.joiningYear || 2024}</p>
+                        <p className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>Joining Date</p>
+                        <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>{selectedStudent.joiningMonth || 'August'} {selectedStudent.joiningYear || 2024}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-400 font-medium">Total Approved Leave Days</p>
-                        <p className="text-sm font-semibold text-indigo-400">
+                        <p className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>Total Approved Leave Days</p>
+                        <p className={`text-sm font-extrabold ${isDark ? 'text-indigo-400' : 'text-indigo-700'}`}>
                           {calculateStudentTotalLeaveDays(selectedStudent)} Days
                         </p>
                       </div>
@@ -1326,34 +1382,38 @@ const Students = () => {
 
                   {/* Grid 2: Contact Information */}
                   <div>
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                      <Phone size={16} className="text-indigo-400" /> Contact Details
+                    <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5 ${isDark ? 'text-gray-400' : 'text-slate-900'}`}>
+                      <Phone size={16} className={isDark ? "text-indigo-400" : "text-indigo-600"} /> Contact Details
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-[#1a1c26] p-4 rounded-xl border border-gray-800">
+                    <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl border ${
+                      isDark ? 'bg-[#1a1c26] border-gray-800' : 'bg-slate-100/80 border-slate-300 shadow-xs'
+                    }`}>
                       <div>
-                        <p className="text-xs text-gray-400 font-medium">Student Mobile Number</p>
-                        <p className="text-sm font-semibold text-white">{selectedStudent.mobile || selectedStudent.mobileNumber || 'N/A'}</p>
+                        <p className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>Student Mobile Number</p>
+                        <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>{selectedStudent.mobile || selectedStudent.mobileNumber || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-400 font-medium">Parents / Emergency Mobile</p>
-                        <p className="text-sm font-semibold text-white">{selectedStudent.parentsMobile || selectedStudent.parentsMobileNumber || 'N/A'}</p>
+                        <p className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>Parents / Emergency Mobile</p>
+                        <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>{selectedStudent.parentsMobile || selectedStudent.parentsMobileNumber || 'N/A'}</p>
                       </div>
                     </div>
                   </div>
 
                   {/* Grid 3: Address & Location */}
                   <div>
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                      <MapPin size={16} className="text-indigo-400" /> Address & Location
+                    <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5 ${isDark ? 'text-gray-400' : 'text-slate-900'}`}>
+                      <MapPin size={16} className={isDark ? "text-indigo-400" : "text-indigo-600"} /> Address & Location
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-[#1a1c26] p-4 rounded-xl border border-gray-800">
+                    <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl border ${
+                      isDark ? 'bg-[#1a1c26] border-gray-800' : 'bg-slate-100/80 border-slate-300 shadow-xs'
+                    }`}>
                       <div>
-                        <p className="text-xs text-gray-400 font-medium">Native Village / Town</p>
-                        <p className="text-sm font-semibold text-white">{selectedStudent.village || 'N/A'}</p>
+                        <p className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>Native Village / Town</p>
+                        <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>{selectedStudent.village || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-400 font-medium">Driving License</p>
-                        <p className="text-sm font-semibold text-white">
+                        <p className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>Driving License</p>
+                        <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>
                           {selectedStudent.drivingLicense ? 'Yes (Available)' : 'No'}
                         </p>
                         {selectedStudent.drivingLicense && selectedStudent.drivingLicenseProofUrl && (
@@ -1368,16 +1428,16 @@ const Students = () => {
                         )}
                       </div>
                       <div className="sm:col-span-2">
-                        <p className="text-xs text-gray-400 font-medium">Full Home Address</p>
-                        <p className="text-sm font-semibold text-white">{selectedStudent.homeAddress || 'N/A'}</p>
+                        <p className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>Full Home Address</p>
+                        <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-950'}`}>{selectedStudent.homeAddress || 'N/A'}</p>
                       </div>
                     </div>
                   </div>
 
                   {/* Grid 4: Custom Yearly Progress & Accomplishments Section */}
-                  <div className="pt-2 border-t border-gray-800/80 mt-2">
+                  <div className={`pt-2 border-t mt-2 ${isDark ? 'border-gray-800/80' : 'border-gray-200'}`}>
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <h3 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                         <Award size={16} className="text-indigo-400" /> Yearly Overall Progress & Accomplishments
                       </h3>
                       {canManageProgress && (
@@ -1392,7 +1452,9 @@ const Students = () => {
 
                     {/* Progress Creation Form */}
                     {showProgressForm && (
-                      <form onSubmit={handleAddProgress} className="bg-[#141622] p-4 rounded-xl border border-indigo-500/30 mb-4 space-y-4 shadow-lg">
+                      <form onSubmit={handleAddProgress} className={`p-4 rounded-xl border mb-4 space-y-4 shadow-lg ${
+                        isDark ? 'bg-[#141622] border-indigo-500/30' : 'bg-indigo-50/50 border-indigo-200'
+                      }`}>
                         <h4 className="text-xs font-bold text-indigo-400 uppercase flex items-center gap-1">
                           <TrendingUp size={14} /> Add New Progress Record
                         </h4>
@@ -1405,11 +1467,13 @@ const Students = () => {
                         
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Category *</label>
+                            <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Category *</label>
                             <select
                               value={progressData.category}
                               onChange={(e) => setProgressData({ ...progressData, category: e.target.value })}
-                              className="w-full bg-[#1a1c26] border border-gray-700 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                              className={`w-full border rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500 ${
+                                isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                              }`}
                             >
                               <option value="Academic">Academic 📚</option>
                               <option value="Extracurricular">Extracurricular 🎨</option>
@@ -1420,58 +1484,68 @@ const Students = () => {
                             </select>
                           </div>
                           <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Title *</label>
+                            <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Title *</label>
                             <input
                               type="text"
                               required
                               value={progressData.title}
                               onChange={(e) => setProgressData({ ...progressData, title: e.target.value })}
                               placeholder="e.g. 1st Rank in Semester 4 / AWS Certified"
-                              className="w-full bg-[#1a1c26] border border-gray-700 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                              className={`w-full border rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500 ${
+                                isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                              }`}
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Description</label>
+                          <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Description</label>
                           <textarea
                             rows="2"
                             value={progressData.description}
                             onChange={(e) => setProgressData({ ...progressData, description: e.target.value })}
                             placeholder="Detailed description of achievement or overall progress during the year..."
-                            className="w-full bg-[#1a1c26] border border-gray-700 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                            className={`w-full border rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500 ${
+                              isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                            }`}
                           />
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                           <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Remarks</label>
+                            <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Remarks</label>
                             <input
                               type="text"
                               value={progressData.remarks}
                               onChange={(e) => setProgressData({ ...progressData, remarks: e.target.value })}
                               placeholder="Special remarks or feedback"
-                              className="w-full bg-[#1a1c26] border border-gray-700 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                              className={`w-full border rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500 ${
+                                isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                              }`}
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Proof / Drive Link</label>
+                            <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Proof / Drive Link</label>
                             <input
                               type="url"
                               value={progressData.proofLink}
                               onChange={(e) => setProgressData({ ...progressData, proofLink: e.target.value })}
                               placeholder="https://drive.google.com/..."
-                              className="w-full bg-[#1a1c26] border border-gray-700 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                              className={`w-full border rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500 ${
+                                isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                              }`}
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Other Details</label>
+                            <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Other Details</label>
                             <input
                               type="text"
                               value={progressData.other}
                               onChange={(e) => setProgressData({ ...progressData, other: e.target.value })}
                               placeholder="Additional custom notes"
-                              className="w-full bg-[#1a1c26] border border-gray-700 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                              className={`w-full border rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500 ${
+                                isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                              }`}
                             />
                           </div>
                         </div>
@@ -1480,7 +1554,9 @@ const Students = () => {
                           <button
                             type="button"
                             onClick={() => setShowProgressForm(false)}
-                            className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-semibold rounded-lg transition"
+                            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
+                              isDark ? 'bg-gray-800 hover:bg-gray-700 text-gray-300' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                            }`}
                           >
                             Cancel
                           </button>
@@ -1501,7 +1577,9 @@ const Students = () => {
                         {selectedStudent.progressItems.map((item) => (
                           <div
                             key={item._id}
-                            className="bg-[#1a1c26] border border-gray-800 rounded-xl p-4 flex flex-col justify-between relative group hover:border-indigo-500/50 transition shadow-sm"
+                            className={`border rounded-xl p-4 flex flex-col justify-between relative group transition shadow-sm ${
+                              isDark ? 'bg-[#1a1c26] border-gray-800 hover:border-indigo-500/50' : 'bg-gray-50 border-gray-200 hover:border-indigo-400'
+                            }`}
                           >
                             <div>
                               <div className="flex items-center justify-between mb-2">
@@ -1511,7 +1589,7 @@ const Students = () => {
                                 {canManageProgress && (
                                   <button
                                     onClick={() => handleDeleteProgress(item._id)}
-                                    className="text-gray-500 hover:text-red-400 p-1 rounded-md transition"
+                                    className="text-gray-400 hover:text-red-500 p-1 rounded-md transition"
                                     title="Delete Progress Record"
                                   >
                                     <Trash2 size={14} />
@@ -1519,32 +1597,34 @@ const Students = () => {
                                 )}
                               </div>
 
-                              <h4 className="text-sm font-bold text-white mb-1">{item.title}</h4>
+                              <h4 className={`text-sm font-bold mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>{item.title}</h4>
 
                               {item.description && (
-                                <p className="text-xs text-gray-300 mb-2 leading-relaxed">{item.description}</p>
+                                <p className={`text-xs mb-2 leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{item.description}</p>
                               )}
 
                               {item.remarks && (
-                                <div className="bg-[#141620] p-2 rounded-lg border border-gray-800 text-[11px] text-gray-400 mb-2">
-                                  <span className="font-semibold text-indigo-400">Remarks: </span>{item.remarks}
+                                <div className={`p-2 rounded-lg border text-[11px] mb-2 ${
+                                  isDark ? 'bg-[#141620] border-gray-800 text-gray-400' : 'bg-white border-gray-200 text-gray-600'
+                                }`}>
+                                  <span className="font-semibold text-indigo-500">Remarks: </span>{item.remarks}
                                 </div>
                               )}
 
                               {item.other && (
-                                <div className="text-[11px] text-gray-400 mb-2">
-                                  <span className="font-semibold text-gray-300">Other: </span>{item.other}
+                                <div className={`text-[11px] mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                                  <span className={`font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Other: </span>{item.other}
                                 </div>
                               )}
                             </div>
 
                             {item.proofLink && (
-                              <div className="pt-2 border-t border-gray-800/80 mt-2">
+                              <div className={`pt-2 border-t mt-2 ${isDark ? 'border-gray-800/80' : 'border-gray-200'}`}>
                                 <a
                                   href={item.proofLink}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 font-semibold transition"
+                                  className="inline-flex items-center gap-1.5 text-xs text-indigo-500 hover:text-indigo-600 font-semibold transition"
                                 >
                                   <ExternalLink size={13} /> View Proof / Link
                                 </a>
@@ -1554,7 +1634,9 @@ const Students = () => {
                         ))}
                       </div>
                     ) : (
-                      <div className="bg-[#1a1c26] border border-gray-800 rounded-xl p-6 text-center text-xs text-gray-500">
+                      <div className={`border rounded-xl p-6 text-center text-xs ${
+                        isDark ? 'bg-[#1a1c26] border-gray-800 text-gray-400' : 'bg-gray-50 border-gray-200 text-gray-500'
+                      }`}>
                         No progress records added yet. Click "Add Progress Record" above to add overall achievements.
                       </div>
                     )}
@@ -1565,7 +1647,9 @@ const Students = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="bg-[#1a1c26] p-4 border-t border-gray-800 flex justify-end rounded-b-2xl">
+            <div className={`p-4 border-t flex justify-end rounded-b-2xl ${
+              isDark ? 'bg-[#1a1c26] border-gray-800' : 'bg-gray-50 border-gray-200'
+            }`}>
               <button
                 onClick={() => { setSelectedStudent(null); setIsEditing(false); }}
                 className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition shadow-xs"

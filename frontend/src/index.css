@@ -4,8 +4,42 @@
 
 @layer base {
   body {
-    background-color: #f9fafb;
-    color: #111827;
+    background-color: #f8fafc;
+    color: #090d16;
+  }
+
+  /* GLOBAL LIGHT MODE HIGH-CONTRAST DARK TEXT ENFORCEMENT */
+  html:not(.dark) {
+    color-scheme: light;
+    color: #090d16;
+  }
+
+  html:not(.dark) body {
+    background-color: #f8fafc;
+    color: #090d16;
+  }
+
+  html:not(.dark) h1,
+  html:not(.dark) h2,
+  html:not(.dark) h3,
+  html:not(.dark) h4,
+  html:not(.dark) h5,
+  html:not(.dark) h6 {
+    color: #090d16;
+  }
+
+  html:not(.dark) p:not([class*="text-indigo"]):not([class*="text-purple"]):not([class*="text-blue"]):not([class*="text-emerald"]):not([class*="text-green"]):not([class*="text-red"]):not([class*="text-amber"]):not([class*="text-rose"]):not([class*="text-sky"]),
+  html:not(.dark) span:not([class*="bg-"]):not([class*="text-indigo"]):not([class*="text-purple"]):not([class*="text-blue"]):not([class*="text-emerald"]):not([class*="text-green"]):not([class*="text-red"]):not([class*="text-amber"]):not([class*="text-rose"]):not([class*="text-sky"]),
+  html:not(.dark) label,
+  html:not(.dark) th,
+  html:not(.dark) td {
+    color: #0f172a;
+  }
+
+  html:not(.dark) input:not([type="submit"]):not([type="button"]),
+  html:not(.dark) select,
+  html:not(.dark) textarea {
+    color: #0f172a;
   }
 }
 

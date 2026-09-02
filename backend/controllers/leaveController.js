@@ -37,7 +37,7 @@ const getLeaveRequests = async (req, res) => {
 // @route   POST /api/leaves
 // @access  Private (Student)
 const createLeaveRequest = async (req, res) => {
-  const { reason, fromDate, toDate, destination, emergencyContact } = req.body;
+  const { reason, fromDate, fromTime, toDate, toTime, requestedDays, previousLeaveDays, destination, emergencyContact } = req.body;
 
   try {
     const student = await Student.findOne({ userId: req.user._id });
@@ -49,7 +49,11 @@ const createLeaveRequest = async (req, res) => {
       studentId: student._id,
       reason,
       fromDate,
+      fromTime: fromTime || '',
       toDate,
+      toTime: toTime || '',
+      requestedDays: requestedDays ? Number(requestedDays) : undefined,
+      previousLeaveDays: previousLeaveDays !== undefined ? Number(previousLeaveDays) : 0,
       destination,
       emergencyContact
     });

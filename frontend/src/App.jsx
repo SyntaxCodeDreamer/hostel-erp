@@ -17,7 +17,7 @@ const Leaves = lazy(() => import('./pages/Leaves'));
 const LeaveRequestForm = lazy(() => import('./pages/LeaveRequestForm'));
 const Tasks = lazy(() => import('./pages/Tasks'));
 const Announcements = lazy(() => import('./pages/Announcements'));
-const Expenses = lazy(() => import('./pages/Expenses'));
+// const Expenses = lazy(() => import('./pages/Expenses'));
 const TrustLeader = lazy(() => import('./pages/TrustLeader'));
 
 import LoadingSpinner from './components/LoadingSpinner';
@@ -56,11 +56,13 @@ function App() {
                     } />
                     <Route path="tasks" element={<Tasks />} />
                     <Route path="announcements" element={<Announcements />} />
+                    {/* 
                     <Route path="expenses" element={
                       <ProtectedRoute allowedRoles={['Admin', 'Leader', 'Trustee', 'Trust Member']}>
                         <Expenses />
                       </ProtectedRoute>
-                    } />
+                    } /> 
+                    */}
                     <Route path="trust-members" element={
                       <ProtectedRoute allowedRoles={['Admin', 'Leader', 'Trustee', 'Trust Member', 'Student']}>
                         <TrustLeader />

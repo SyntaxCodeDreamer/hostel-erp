@@ -35,7 +35,7 @@ const subscribe = async (req, res) => {
         keys,
         userAgent
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     );
 
     res.status(201).json({ message: 'Push subscription saved successfully', subscription });

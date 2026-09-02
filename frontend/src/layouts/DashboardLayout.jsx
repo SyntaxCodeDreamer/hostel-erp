@@ -211,13 +211,14 @@ const DashboardLayout = () => {
                     ? 'bg-indigo-600 text-white shadow-sm font-semibold' 
                     : isDark 
                     ? 'text-gray-400 hover:bg-[#1a1c29] hover:text-white' 
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    : 'text-slate-800 font-semibold hover:bg-slate-100 hover:text-slate-950'
                 }`}
               >
                 {item.label}
               </Link>
             ))}
 
+            {/* 
             {['admin', 'leader', 'trustee', 'trust member'].includes((user?.role || '').toLowerCase()) && (
               <Link 
                 to="/expenses" 
@@ -226,12 +227,13 @@ const DashboardLayout = () => {
                     ? 'bg-indigo-600 text-white shadow-sm font-semibold' 
                     : isDark 
                     ? 'text-gray-400 hover:bg-[#1a1c29] hover:text-white' 
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    : 'text-slate-800 font-semibold hover:bg-slate-100 hover:text-slate-950'
                 }`}
               >
                 Expenses
               </Link>
             )}
+            */}
 
             <Link 
               to="/trust-members" 

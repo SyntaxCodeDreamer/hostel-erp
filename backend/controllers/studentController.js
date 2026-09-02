@@ -5,46 +5,55 @@ const Notification = require('../models/Notification');
 const { sendWelcomeEmail, getBrevoDefaultPassword } = require('../utils/sendEmail');
 const { sendPushNotification } = require('../utils/webPush');
 
-// Helper to auto-sync student status ('On Leave' vs 'Active') based on today's date and approved leave date range
-const syncStudentLeaveStatus = async (studentDoc) => {
-  if (!studentDoc) return studentDoc;
+// Helper to auto-sync student status ('On Leave' vs 'Available') for a list of students in 1 SINGLE DB QUERY
+const syncBulkStudentLeaveStatus = async (students) => {
+  if (!Array.isArray(students) || students.length === 0) return students;
   try {
-    const currentStatus = (studentDoc.status || '').toLowerCase();
-    if (currentStatus === 'in-active' || currentStatus === 'inactive' || currentStatus === 'left') {
-      return studentDoc;
-    }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
 
-    const approvedLeaves = await LeaveRequest.find({
-      studentId: studentDoc._id,
-      status: { $in: ['Approved', 'approved'] }
-    }).lean();
+    const studentIds = students.map(s => s._id);
 
-    let isOnLeaveToday = false;
+    // 1 single query for ALL students in the array instead of N separate queries
+    const activeLeaves = await LeaveRequest.find({
+      studentId: { $in: studentIds },
+      status: { $in: ['Approved', 'approved'] },
+      fromDate: { $lte: todayEnd },
+      toDate: { $gte: todayStart }
+    }).select('studentId').lean();
 
-    for (const leave of approvedLeaves) {
-      if (!leave.fromDate || !leave.toDate) continue;
-      const from = new Date(leave.fromDate);
-      from.setHours(0, 0, 0, 0);
-      const to = new Date(leave.toDate);
-      to.setHours(23, 59, 59, 999);
+    const onLeaveSet = new Set(activeLeaves.map(l => (l.studentId?._id || l.studentId).toString()));
 
-      if (today >= from && today <= to) {
-        isOnLeaveToday = true;
-        break;
+    const bulkOps = [];
+    for (const student of students) {
+      const currentStatus = (student.status || '').toLowerCase();
+      if (currentStatus === 'in-active' || currentStatus === 'inactive' || currentStatus === 'left') {
+        continue;
+      }
+
+      const isOnLeave = onLeaveSet.has(student._id.toString());
+      const expectedStatus = isOnLeave ? 'On Leave' : 'Available';
+
+      if (student.status !== expectedStatus) {
+        student.status = expectedStatus;
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: student._id },
+            update: { $set: { status: expectedStatus } }
+          }
+        });
       }
     }
 
-    const expectedStatus = isOnLeaveToday ? 'On Leave' : 'Active';
-    if (studentDoc.status !== expectedStatus) {
-      studentDoc.status = expectedStatus;
-      await Student.updateOne({ _id: studentDoc._id }, { status: expectedStatus });
+    if (bulkOps.length > 0) {
+      await Student.bulkWrite(bulkOps);
     }
   } catch (err) {
     console.error('Error syncing student leave status:', err);
   }
-  return studentDoc;
+  return students;
 };
 
 // @desc    Get students (filtered strictly by ownership for Students)
@@ -72,7 +81,7 @@ const getStudents = async (req, res) => {
           parentsMobile: 'N/A',
           drivingLicense: false,
           roomNumber: 'Unassigned',
-          status: 'Active'
+          status: 'Available'
         });
         await newStudent.save();
         student = await Student.findById(newStudent._id).populate('userId', 'name email profileImage').lean();
@@ -80,10 +89,42 @@ const getStudents = async (req, res) => {
       return res.json([student]);
     }
 
-    const students = await Student.find(query).populate('userId', 'name email profileImage').lean();
-    for (const student of students) {
-      await syncStudentLeaveStatus(student);
+    if (req.query.search) {
+      const s = req.query.search.trim();
+      const regex = new RegExp(s, 'i');
+      query.$or = [
+        { fullName: regex },
+        { course: regex },
+        { village: regex },
+        { roomNumber: regex },
+        { mobile: regex }
+      ];
     }
+
+    // Support pagination parameters (page & limit) to fetch only requested page items
+    if (req.query.page || req.query.limit) {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 8;
+      const skip = (page - 1) * limit;
+
+      const total = await Student.countDocuments(query);
+      const students = await Student.find(query)
+        .populate('userId', 'name email profileImage')
+        .skip(skip)
+        .limit(limit)
+        .lean();
+
+      await syncBulkStudentLeaveStatus(students);
+      return res.json({
+        students,
+        total,
+        page,
+        totalPages: Math.ceil(total / limit)
+      });
+    }
+
+    const students = await Student.find(query).populate('userId', 'name email profileImage').lean();
+    await syncBulkStudentLeaveStatus(students);
     res.json(students);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -99,7 +140,7 @@ const getMyStudentProfile = async (req, res) => {
     if (!student) {
       return res.status(404).json({ message: 'Student profile not found' });
     }
-    await syncStudentLeaveStatus(student);
+    await syncBulkStudentLeaveStatus([student]);
     res.json(student);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -120,7 +161,7 @@ const getStudentById = async (req, res) => {
     if (userRole === 'student' && student.userId?._id.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized to view other student profiles' });
     }
-    await syncStudentLeaveStatus(student);
+    await syncBulkStudentLeaveStatus([student]);
     res.json(student);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });

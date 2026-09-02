@@ -8,7 +8,11 @@ const leaveRequestSchema = new mongoose.Schema({
   },
   reason: { type: String, required: true },
   fromDate: { type: Date, required: true },
+  fromTime: { type: String, default: '' },
   toDate: { type: Date, required: true },
+  toTime: { type: String, default: '' },
+  requestedDays: { type: Number },
+  previousLeaveDays: { type: Number, default: 0 },
   destination: { type: String, required: true },
   emergencyContact: { type: String, required: true },
   status: {
