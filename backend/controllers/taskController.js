@@ -148,6 +148,10 @@ const createTask = async (req, res) => {
       }
     }
 
+    if (req.app?.locals?.io) {
+      req.app.locals.io.emit('dashboard_update', { type: 'task_created' });
+    }
+
     res.status(201).json(createdTask);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -172,6 +176,11 @@ const updateTaskStatus = async (req, res) => {
 
       task.status = status;
       const updatedTask = await task.save();
+
+      if (req.app?.locals?.io) {
+        req.app.locals.io.emit('dashboard_update', { type: 'task_updated' });
+      }
+
       res.json(updatedTask);
     } else {
       res.status(404).json({ message: 'Task not found' });

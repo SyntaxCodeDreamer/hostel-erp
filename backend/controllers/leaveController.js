@@ -88,6 +88,10 @@ const createLeaveRequest = async (req, res) => {
       url: '/leaves'
     });
 
+    if (req.app.locals.io) {
+      req.app.locals.io.emit('dashboard_update', { type: 'leave_created' });
+    }
+
     res.status(201).json(createdLeave);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -146,6 +150,10 @@ const updateLeaveStatus = async (req, res) => {
         body: `Your leave request has been ${status.toLowerCase()} by admin.`,
         url: '/leaves'
       });
+    }
+
+    if (req.app.locals.io) {
+      req.app.locals.io.emit('dashboard_update', { type: 'leave_updated' });
     }
 
     res.json(updatedLeave);

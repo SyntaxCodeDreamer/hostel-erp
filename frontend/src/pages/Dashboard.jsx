@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import apiClient from '../utils/apiClient';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
+import { SocketContext } from '../context/SocketContext';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import {
-  Users, Calendar, CheckSquare, Wallet, BookOpen, TrendingUp, Activity, Megaphone, Award, FileText, ExternalLink, Layers
+  Users, Calendar, CheckSquare, Wallet, BookOpen, TrendingUp, Activity, Megaphone, Award, FileText, ExternalLink, Layers, RefreshCw, Clock
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -28,26 +29,22 @@ const itemVariants = {
 const Dashboard = () => {
   const { user } = useContext(AuthContext);
   const { theme } = useContext(ThemeContext);
+  const { socket } = useContext(SocketContext) || {};
   const userRole = (user?.role || '').toLowerCase();
   const isAdminOrLeader = ['admin', 'leader', 'trust member', 'trustee'].includes(userRole);
   const [data, setData] = useState(null);
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [selectedCourseIndex, setSelectedCourseIndex] = useState(null);
 
   const isDark = theme === 'dark';
 
   const [refreshToggle, setRefreshToggle] = useState(false);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, [refreshToggle]);
-
-  const handleRefresh = () => {
-    setRefreshToggle(prev => !prev);
-  };
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async (silent = false) => {
+    if (!silent && !data) setLoading(true);
     try {
       const [analyticsRes, annRes] = await Promise.all([
         apiClient.get('/analytics').catch(() => ({ data: null })),
@@ -56,7 +53,7 @@ const Dashboard = () => {
 
       if (analyticsRes.data) {
         setData(analyticsRes.data);
-      } else {
+      } else if (!data) {
         setData({
           totalStudents: 0,
           pendingLeaves: 0,
@@ -70,11 +67,54 @@ const Dashboard = () => {
       }
 
       setAnnouncements(annRes.data || []);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Error loading dashboard:', error);
     } finally {
       setLoading(false);
     }
+  }, [data]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [refreshToggle]);
+
+  // Periodic background refresh every 30 seconds & on window focus
+  useEffect(() => {
+    const onFocus = () => fetchDashboardData(true);
+    window.addEventListener('focus', onFocus);
+
+    const timer = setInterval(() => {
+      fetchDashboardData(true);
+    }, 30000);
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      clearInterval(timer);
+    };
+  }, [fetchDashboardData]);
+
+  // Real-time socket event listeners
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleDashboardEvent = () => {
+      fetchDashboardData(true);
+    };
+
+    socket.on('dashboard_update', handleDashboardEvent);
+    socket.on('new_notification', handleDashboardEvent);
+
+    return () => {
+      socket.off('dashboard_update', handleDashboardEvent);
+      socket.off('new_notification', handleDashboardEvent);
+    };
+  }, [socket, fetchDashboardData]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchDashboardData();
+    setTimeout(() => setIsRefreshing(false), 500);
   };
 
   // Student view restriction removed so they can access the awesome dashboard widgets
@@ -164,11 +204,33 @@ const Dashboard = () => {
           <h1 className={`text-3xl font-extrabold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Welcome back!</h1>
           <p className={`text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Here is a quick snapshot of the hostel operations today.</p>
         </div>
-        <div className={`flex items-center gap-2 border px-4 py-2 rounded-xl text-xs font-semibold shadow-xs self-start sm:self-auto ${
-          isDark ? 'bg-[#1a1c26] border-purple-900/50 text-purple-300' : 'bg-indigo-50 border-indigo-200 text-indigo-700'
-        }`}>
-          <Calendar size={16} className={isDark ? 'text-purple-400' : 'text-indigo-600'} />
-          <span>Academic Term 2026</span>
+        <div className="flex items-center gap-3 flex-wrap self-start sm:self-auto">
+          {/* Refresh Action Button */}
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition shadow-xs active:scale-95 cursor-pointer ${
+              isDark
+                ? 'bg-[#181a26] border-gray-700 text-gray-200 hover:bg-gray-800 hover:border-indigo-500/50'
+                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-indigo-300'
+            }`}
+            title="Refresh dashboard data"
+          >
+            <RefreshCw size={14} className={`${isRefreshing ? 'animate-spin text-indigo-500' : isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+            <span>{isRefreshing ? 'Updating...' : 'Refresh'}</span>
+            {lastUpdated && (
+              <span className={`text-[10px] ml-1 font-normal opacity-70 hidden md:inline`}>
+                ({lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })})
+              </span>
+            )}
+          </button>
+
+          <div className={`flex items-center gap-2 border px-4 py-2 rounded-xl text-xs font-semibold shadow-xs ${
+            isDark ? 'bg-[#1a1c26] border-purple-900/50 text-purple-300' : 'bg-indigo-50 border-indigo-200 text-indigo-700'
+          }`}>
+            <Calendar size={16} className={isDark ? 'text-purple-400' : 'text-indigo-600'} />
+            <span>Academic Term 2026</span>
+          </div>
         </div>
       </motion.div>
 
@@ -181,6 +243,16 @@ const Dashboard = () => {
             <div>
               <p className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Total Residents</p>
               <h2 className={`text-3xl font-extrabold mt-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>{totalResidentsCount}</h2>
+              <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  {d.availableCount ?? Math.max(0, totalResidentsCount - (d.onLeaveCount || 0))} In Hostel
+                </span>
+                {(d.onLeaveCount || 0) > 0 && (
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    {d.onLeaveCount} On Leave
+                  </span>
+                )}
+              </div>
             </div>
             <div className="p-3.5 bg-purple-100 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800/30 text-purple-600 dark:text-purple-400 rounded-xl">
               <Users size={22} />
@@ -216,10 +288,21 @@ const Dashboard = () => {
         <motion.div whileHover={{ y: -5 }} className={`border rounded-2xl p-5 flex items-center justify-between shadow-xs transition-shadow hover:shadow-md ${isDark ? 'bg-[#14161f] border-gray-800/80' : 'bg-white border-gray-200'}`}>
           <div>
             <p className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{isAdminOrLeader ? 'Total Expenses' : 'Approved Leave Days'}</p>
-            <h2 className={`text-3xl font-extrabold mt-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>{isAdminOrLeader ? `₹${monthlyExpenseVal}` : (d.totalLeaveDays !== undefined ? d.totalLeaveDays : monthlyExpenseVal)}</h2>
-            <p className="text-[11px] text-indigo-500 font-semibold mt-1">
-              {isAdminOrLeader ? 'Current total registered' : 'Total number of days'}
-            </p>
+            <h2 className={`text-3xl font-extrabold mt-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>{isAdminOrLeader ? `₹${monthlyExpenseVal}` : (d.totalLeaveDays !== undefined ? d.totalLeaveDays : 0)}</h2>
+            <div className="mt-1 flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] text-indigo-500 font-semibold">
+                {isAdminOrLeader ? 'Current total registered' : 'Total approved days'}
+              </span>
+              {!isAdminOrLeader && d.studentStatus && (
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  d.studentStatus === 'On Leave'
+                    ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30'
+                    : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                }`}>
+                  {d.studentStatus}
+                </span>
+              )}
+            </div>
           </div>
           <div className="p-3.5 bg-indigo-100 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800/30 text-indigo-600 dark:text-indigo-400 rounded-xl">
             {isAdminOrLeader ? <Wallet size={22} /> : <Calendar size={22} />}

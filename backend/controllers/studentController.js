@@ -474,6 +474,7 @@ const deleteStudent = async (req, res) => {
 };
 
 module.exports = {
+  syncBulkStudentLeaveStatus,
   getStudents,
   getMyStudentProfile,
   getStudentById,

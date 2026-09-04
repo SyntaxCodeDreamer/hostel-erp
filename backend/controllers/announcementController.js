@@ -121,6 +121,10 @@ const createAnnouncement = async (req, res) => {
       }).catch(err => console.error('Push notification error:', err.message));
     }
 
+    if (req.app?.locals?.io) {
+      req.app.locals.io.emit('dashboard_update', { type: 'announcement_created' });
+    }
+
     res.status(201).json(createdAnnouncement);
   } catch (error) {
     res.status(400).json({ message: error.message });
