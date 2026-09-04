@@ -109,8 +109,6 @@ const Students = () => {
     });
 
     let sumDays = 0;
-    let maxPreviousDays = 0;
-
     studentLeaves.forEach(l => {
       if (l.requestedDays !== undefined && l.requestedDays !== null && l.requestedDays !== '') {
         sumDays += Number(l.requestedDays);
@@ -122,18 +120,18 @@ const Students = () => {
           sumDays += Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1;
         }
       }
-
-      if (l.previousLeaveDays !== undefined && l.previousLeaveDays !== null && l.previousLeaveDays !== '') {
-        const prev = Number(l.previousLeaveDays);
-        if (prev > maxPreviousDays) {
-          maxPreviousDays = prev;
-        }
-      }
     });
 
-    const profileLeaveCount = Number(student.leaveCount || student.previousLeaveDays || 0);
+    // Check if there were legacy pre-ERP prior leave days entered on the student's earliest leave request
+    let initialPriorDays = 0;
+    if (studentLeaves.length > 0) {
+      const sorted = [...studentLeaves].sort((a, b) => new Date(a.createdAt || a.fromDate) - new Date(b.createdAt || b.fromDate));
+      initialPriorDays = Number(sorted[0].previousLeaveDays || 0);
+    } else if (student.previousLeaveDays) {
+      initialPriorDays = Number(student.previousLeaveDays || 0);
+    }
 
-    return sumDays + Math.max(maxPreviousDays, profileLeaveCount);
+    return sumDays + initialPriorDays;
   };
 
   const handleDeleteStudent = async (studentId) => {
@@ -305,10 +303,103 @@ const Students = () => {
     return student.userId?.email || student.email || 'No email provided';
   };
 
+  const parseLeaveStartDateTime = (fromDate, fromTime) => {
+    if (!fromDate) return null;
+    const d = new Date(fromDate);
+    if (isNaN(d.getTime())) return null;
+
+    const year = d.getUTCFullYear();
+    const month = d.getUTCMonth();
+    const day = d.getUTCDate();
+
+    let hours = 0;
+    let minutes = 0;
+
+    if (fromTime && typeof fromTime === 'string' && fromTime.trim()) {
+      const raw = fromTime.trim();
+      const isPM = /pm/i.test(raw);
+      const isAM = /am/i.test(raw);
+      const parts = raw.replace(/[^\d:]/g, '').split(':');
+      if (parts.length >= 1) {
+        let h = parseInt(parts[0], 10);
+        let m = parts.length >= 2 ? parseInt(parts[1], 10) : 0;
+        if (!isNaN(h)) {
+          if (isPM && h < 12) h += 12;
+          if (isAM && h === 12) h = 0;
+          hours = h;
+        }
+        if (!isNaN(m)) minutes = m;
+      }
+    }
+
+    return new Date(year, month, day, hours, minutes, 0, 0);
+  };
+
+  const parseLeaveEndDateTime = (toDate, toTime) => {
+    if (!toDate) return null;
+    const d = new Date(toDate);
+    if (isNaN(d.getTime())) return null;
+
+    const year = d.getUTCFullYear();
+    const month = d.getUTCMonth();
+    const day = d.getUTCDate();
+
+    let hours = 23;
+    let minutes = 59;
+    let seconds = 59;
+
+    if (toTime && typeof toTime === 'string' && toTime.trim()) {
+      const raw = toTime.trim();
+      const isPM = /pm/i.test(raw);
+      const isAM = /am/i.test(raw);
+      const parts = raw.replace(/[^\d:]/g, '').split(':');
+      if (parts.length >= 1) {
+        let h = parseInt(parts[0], 10);
+        let m = parts.length >= 2 ? parseInt(parts[1], 10) : 0;
+        if (!isNaN(h)) {
+          if (isPM && h < 12) h += 12;
+          if (isAM && h === 12) h = 0;
+          hours = h;
+          seconds = 0;
+        }
+        if (!isNaN(m)) minutes = m;
+      }
+    }
+
+    return new Date(year, month, day, hours, minutes, seconds, 999);
+  };
+
+  const isStudentOnActiveLeave = (student) => {
+    if (!student) return false;
+    const studentIdStr = (student._id || student.id || '').toString();
+    if (!studentIdStr || !Array.isArray(leavesList) || leavesList.length === 0) {
+      return (student.status || '').toLowerCase() === 'on leave';
+    }
+
+    const now = new Date();
+    const approvedLeaves = leavesList.filter(l => {
+      const lStudentId = (l.studentId?._id || l.studentId || '').toString();
+      return lStudentId === studentIdStr && (l.status === 'Approved' || l.status === 'approved');
+    });
+
+    if (approvedLeaves.length === 0) return false;
+
+    return approvedLeaves.some(l => {
+      const start = parseLeaveStartDateTime(l.fromDate, l.fromTime);
+      const end = parseLeaveEndDateTime(l.toDate, l.toTime);
+      return start && end && now >= start && now <= end;
+    });
+  };
+
   const getStudentStatus = (student) => {
     const raw = (student?.status || 'Available').toString();
     if (raw.toLowerCase() === 'in-active' || raw.toLowerCase() === 'inactive' || raw.toLowerCase() === 'left') return 'In-Active';
-    if (raw.toLowerCase() === 'on leave') return 'On Leave';
+    
+    // Check real-time active status against leaving time
+    if (isStudentOnActiveLeave(student)) {
+      return 'On Leave';
+    }
+    
     return 'Available';
   };
 

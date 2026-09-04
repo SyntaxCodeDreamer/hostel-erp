@@ -44,8 +44,6 @@ const LeaveRequestForm = () => {
           );
 
           let sumDays = 0;
-          let maxPrevEntered = 0;
-
           approvedLeaves.forEach(l => {
             if (l.requestedDays !== undefined && l.requestedDays !== null && l.requestedDays !== '') {
               sumDays += Number(l.requestedDays);
@@ -57,14 +55,15 @@ const LeaveRequestForm = () => {
                 sumDays += Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1;
               }
             }
-
-            if (l.previousLeaveDays !== undefined && l.previousLeaveDays !== null && l.previousLeaveDays !== '') {
-              const p = Number(l.previousLeaveDays);
-              if (p > maxPrevEntered) maxPrevEntered = p;
-            }
           });
 
-          const totalTaken = sumDays + maxPrevEntered;
+          let initialBaseline = 0;
+          if (approvedLeaves.length > 0) {
+            const sorted = [...approvedLeaves].sort((a, b) => new Date(a.createdAt || a.fromDate) - new Date(b.createdAt || b.fromDate));
+            initialBaseline = Number(sorted[0].previousLeaveDays || 0);
+          }
+
+          const totalTaken = sumDays + initialBaseline;
           setFormData(prev => ({ ...prev, previousLeaveDays: totalTaken.toString() }));
         }
       } catch (err) {
@@ -74,23 +73,63 @@ const LeaveRequestForm = () => {
     fetchLeaveStats();
   }, []);
 
+  const addDaysToDate = (dateStr, days) => {
+    if (!dateStr || isNaN(days) || days <= 0) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    d.setDate(d.getDate() + (days - 1));
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => {
       const nextForm = { ...prev, [name]: value };
-      if (name === 'fromDate' || name === 'toDate') {
-        const from = name === 'fromDate' ? value : prev.fromDate;
-        const to = name === 'toDate' ? value : prev.toDate;
-        if (from && to) {
+
+      if (name === 'requestedDays') {
+        const numDays = parseInt(value, 10);
+        if (!isNaN(numDays) && numDays > 0 && nextForm.fromDate) {
+          const newToDate = addDaysToDate(nextForm.fromDate, numDays);
+          if (newToDate) {
+            nextForm.toDate = newToDate;
+          }
+        }
+      } else if (name === 'fromDate') {
+        const from = value;
+        const numDays = parseInt(prev.requestedDays, 10);
+        if (from && !isNaN(numDays) && numDays > 0) {
+          const newToDate = addDaysToDate(from, numDays);
+          if (newToDate) {
+            nextForm.toDate = newToDate;
+          }
+        } else if (from && nextForm.toDate) {
           const f = new Date(from);
-          const t = new Date(to);
-          if (!isNaN(f.getTime()) && !isNaN(t.getTime())) {
+          const t = new Date(nextForm.toDate);
+          if (!isNaN(f.getTime()) && !isNaN(t.getTime()) && t >= f) {
             const diff = Math.abs(t - f);
             const calcDays = Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1;
             nextForm.requestedDays = calcDays.toString();
           }
         }
+      } else if (name === 'toDate') {
+        const to = value;
+        const from = nextForm.fromDate;
+        if (from && to) {
+          const f = new Date(from);
+          const t = new Date(to);
+          if (!isNaN(f.getTime()) && !isNaN(t.getTime())) {
+            const diff = t - f;
+            if (diff >= 0) {
+              const calcDays = Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1;
+              nextForm.requestedDays = calcDays.toString();
+            }
+          }
+        }
       }
+
       return nextForm;
     });
   };

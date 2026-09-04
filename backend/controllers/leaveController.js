@@ -3,6 +3,7 @@ const Student = require('../models/Student');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { sendPushNotification } = require('../utils/webPush');
+const { isLeaveCurrentlyActive } = require('../utils/dateHelper');
 
 // @desc    Get all leave requests (filtered by ownership for Students)
 // @route   GET /api/leaves
@@ -113,12 +114,14 @@ const updateLeaveStatus = async (req, res) => {
 
     // Auto update student status & leave count if Approved
     if (status === 'Approved' || status === 'approved') {
+      const isCurrentlyActive = isLeaveCurrentlyActive(updatedLeave, new Date());
+      const newStatus = isCurrentlyActive ? 'On Leave' : 'Available';
       await Student.findByIdAndUpdate(leaveRequest.studentId, { 
-        status: 'On Leave',
+        status: newStatus,
         $inc: { leaveCount: 1 }
       });
     } else if (status === 'Rejected' || status === 'rejected') {
-      await Student.findByIdAndUpdate(leaveRequest.studentId, { status: 'Active' });
+      await Student.findByIdAndUpdate(leaveRequest.studentId, { status: 'Available' });
     }
 
     // Get the student's User ID to send notification

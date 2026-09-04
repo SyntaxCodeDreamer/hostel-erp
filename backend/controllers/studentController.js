@@ -4,6 +4,7 @@ const LeaveRequest = require('../models/LeaveRequest');
 const Notification = require('../models/Notification');
 const { sendWelcomeEmail, getBrevoDefaultPassword } = require('../utils/sendEmail');
 const { sendPushNotification } = require('../utils/webPush');
+const { isLeaveCurrentlyActive } = require('../utils/dateHelper');
 
 // Helper to auto-sync student status ('On Leave' vs 'Available') for a list of students in 1 SINGLE DB QUERY
 const syncBulkStudentLeaveStatus = async (students) => {
@@ -22,9 +23,16 @@ const syncBulkStudentLeaveStatus = async (students) => {
       status: { $in: ['Approved', 'approved'] },
       fromDate: { $lte: todayEnd },
       toDate: { $gte: todayStart }
-    }).select('studentId').lean();
+    }).select('studentId fromDate fromTime toDate toTime status').lean();
 
-    const onLeaveSet = new Set(activeLeaves.map(l => (l.studentId?._id || l.studentId).toString()));
+    const now = new Date();
+    const onLeaveSet = new Set();
+    for (const l of activeLeaves) {
+      if (isLeaveCurrentlyActive(l, now)) {
+        const sId = (l.studentId?._id || l.studentId).toString();
+        onLeaveSet.add(sId);
+      }
+    }
 
     const bulkOps = [];
     for (const student of students) {
