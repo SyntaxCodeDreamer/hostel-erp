@@ -1,5 +1,6 @@
 const TrustMember = require('../models/TrustMember');
 const LeaderProfile = require('../models/LeaderProfile');
+const Student = require('../models/Student');
 const User = require('../models/User');
 const { sendWelcomeEmail, getBrevoDefaultPassword } = require('../utils/sendEmail');
 
@@ -98,7 +99,12 @@ const deleteTrustMember = async (req, res) => {
 const getLeaders = async (req, res) => {
   try {
     const leaders = await LeaderProfile.find({}).populate('userId', 'name email').lean();
-    res.json(leaders);
+    const formattedLeaders = leaders.map(l => ({
+      ...l,
+      name: l.name || l.userId?.name || '',
+      email: l.email || l.userId?.email || ''
+    }));
+    res.json(formattedLeaders);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -139,14 +145,82 @@ const createLeader = async (req, res) => {
       password: finalPassword
     });
 
+    const leaderName = name || user.name || 'Leader';
     const leaderProfile = await LeaderProfile.create({
       userId: user._id,
+      name: leaderName,
+      email: cleanEmail,
       role: assignedRole,
-      contactNumber,
+      contactNumber: contactNumber || '',
       duration: duration || ''
     });
 
+    // Automatically create or link a Student profile for this Leader
+    let student = await Student.findOne({ userId: user._id });
+    if (!student) {
+      await Student.create({
+        userId: user._id,
+        fullName: leaderName,
+        email: cleanEmail,
+        village: 'N/A',
+        homeAddress: 'N/A',
+        course: 'N/A',
+        collegeName: 'N/A',
+        joiningYear: new Date().getFullYear(),
+        joiningMonth: 'August',
+        mobile: contactNumber || 'N/A',
+        parentsMobile: 'N/A',
+        drivingLicense: false,
+        roomNumber: 'Unassigned',
+        status: 'Available'
+      });
+    }
+
     res.status(201).json(leaderProfile);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// @desc    Update a leader profile
+// @route   PUT /api/trust/leaders/:id
+// @access  Private (Admin)
+const updateLeader = async (req, res) => {
+  const { name, email, role, contactNumber, duration } = req.body;
+  try {
+    const leader = await LeaderProfile.findById(req.params.id);
+    if (!leader) {
+      return res.status(404).json({ message: 'Leader not found' });
+    }
+
+    if (name) leader.name = name;
+    if (email) leader.email = email.trim().toLowerCase();
+    if (role) leader.role = role;
+    if (contactNumber !== undefined) leader.contactNumber = contactNumber;
+    if (duration !== undefined) leader.duration = duration;
+
+    await leader.save();
+
+    // Update associated User and Student
+    if (leader.userId) {
+      const user = await User.findById(leader.userId);
+      if (user) {
+        if (name) user.name = name;
+        if (email) user.email = email.trim().toLowerCase();
+        if (role) user.role = role;
+        await user.save();
+      }
+
+      const student = await Student.findOne({ userId: leader.userId });
+      if (student) {
+        if (name) student.fullName = name;
+        if (email) student.email = email.trim().toLowerCase();
+        if (contactNumber) student.mobile = contactNumber;
+        await student.save();
+      }
+    }
+
+    res.json(leader);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -159,6 +233,10 @@ const deleteLeader = async (req, res) => {
   try {
     const leader = await LeaderProfile.findById(req.params.id);
     if (leader) {
+      if (leader.userId) {
+        await User.findByIdAndDelete(leader.userId).catch(() => null);
+        await Student.findOneAndDelete({ userId: leader.userId }).catch(() => null);
+      }
       await leader.deleteOne();
       res.json({ message: 'Leader removed' });
     } else {
@@ -175,5 +253,6 @@ module.exports = {
   deleteTrustMember,
   getLeaders,
   createLeader,
+  updateLeader,
   deleteLeader
 };

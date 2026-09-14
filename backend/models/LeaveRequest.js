@@ -6,6 +6,10 @@ const leaveRequestSchema = new mongoose.Schema({
     ref: 'Student',
     required: true
   },
+  appliedDate: {
+    type: Date,
+    default: Date.now
+  },
   reason: { type: String, required: true },
   fromDate: { type: Date, required: true },
   fromTime: { type: String, default: '' },
@@ -13,6 +17,8 @@ const leaveRequestSchema = new mongoose.Schema({
   toTime: { type: String, default: '' },
   requestedDays: { type: Number },
   previousLeaveDays: { type: Number, default: 0 },
+  studentName: { type: String, default: '' },
+  roomNumber: { type: String, default: '' },
   destination: { type: String, required: true },
   emergencyContact: { type: String, required: true },
   status: {
@@ -23,13 +29,20 @@ const leaveRequestSchema = new mongoose.Schema({
   reviewedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
-  }
+  },
+  reviewerName: { type: String, default: '' },
+  reviewerRole: { type: String, default: '' },
+  reviewedAt: {
+    type: Date
+  },
+  remarks: { type: String, default: '' }
 }, {
   timestamps: true
 });
 
 leaveRequestSchema.index({ studentId: 1, status: 1 });
 leaveRequestSchema.index({ createdAt: -1 });
+leaveRequestSchema.index({ appliedDate: -1 });
 
 const LeaveRequest = mongoose.model('LeaveRequest', leaveRequestSchema);
 

@@ -122,13 +122,21 @@ const createTask = async (req, res) => {
   const { title, description, assignedTo, priority, dueDate } = req.body;
 
   try {
+    let assignedUser = null;
+    if (assignedTo) {
+      assignedUser = await User.findById(assignedTo).lean();
+    }
+
     const task = new Task({
       title,
       description,
       assignedTo,
+      assignedToName: assignedUser?.name || '',
+      assignedToEmail: assignedUser?.email || '',
       priority,
       dueDate,
-      createdBy: req.user._id
+      createdBy: req.user._id,
+      createdByName: req.user.name || 'Admin'
     });
 
     const createdTask = await task.save();

@@ -48,6 +48,9 @@ const createLeaveRequest = async (req, res) => {
 
     const leaveRequest = new LeaveRequest({
       studentId: student._id,
+      studentName: student.fullName || req.user.name || '',
+      roomNumber: student.roomNumber || '',
+      appliedDate: new Date(),
       reason,
       fromDate,
       fromTime: fromTime || '',
@@ -102,7 +105,7 @@ const createLeaveRequest = async (req, res) => {
 // @route   PUT /api/leaves/:id/status
 // @access  Private (Admin/Leader)
 const updateLeaveStatus = async (req, res) => {
-  const { status } = req.body;
+  const { status, remarks } = req.body;
 
   try {
     const leaveRequest = await LeaveRequest.findById(req.params.id);
@@ -113,6 +116,10 @@ const updateLeaveStatus = async (req, res) => {
 
     leaveRequest.status = status;
     leaveRequest.reviewedBy = req.user._id;
+    leaveRequest.reviewerName = req.user.name || '';
+    leaveRequest.reviewerRole = req.user.role || '';
+    leaveRequest.reviewedAt = new Date();
+    if (remarks !== undefined) leaveRequest.remarks = remarks;
 
     const updatedLeave = await leaveRequest.save();
 
@@ -162,8 +169,91 @@ const updateLeaveStatus = async (req, res) => {
   }
 };
 
+// @desc    Get a single leave request by ID
+// @route   GET /api/leaves/:id
+// @access  Private
+const getLeaveRequestById = async (req, res) => {
+  try {
+    const leave = await LeaveRequest.findById(req.params.id)
+      .populate({
+        path: 'studentId',
+        populate: { path: 'userId', select: 'name email profileImage' }
+      })
+      .populate('reviewedBy', 'name role')
+      .lean();
+
+    if (!leave) {
+      return res.status(404).json({ message: 'Leave request not found' });
+    }
+
+    const userRole = (req.user.role || '').toLowerCase();
+    if (userRole === 'student') {
+      const student = await Student.findOne({ userId: req.user._id }).lean();
+      if (!student || leave.studentId._id.toString() !== student._id.toString()) {
+        return res.status(403).json({ message: 'Not authorized to view this leave request' });
+      }
+    }
+
+    res.json(leave);
+  } catch (error) {
+    res.status(500).json({ message: error.message || 'Server error' });
+  }
+};
+
+// @desc    Update a leave request (Student only, while status is Pending)
+// @route   PUT /api/leaves/:id
+// @access  Private (Student)
+const updateLeaveRequest = async (req, res) => {
+  const { reason, fromDate, fromTime, toDate, toTime, requestedDays, destination, emergencyContact } = req.body;
+
+  try {
+    const student = await Student.findOne({ userId: req.user._id });
+    if (!student) {
+      return res.status(404).json({ message: 'Student profile not found' });
+    }
+
+    const leaveRequest = await LeaveRequest.findById(req.params.id);
+    if (!leaveRequest) {
+      return res.status(404).json({ message: 'Leave request not found' });
+    }
+
+    // Verify ownership: only the student who created the request can edit it
+    if (leaveRequest.studentId.toString() !== student._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to edit this leave request' });
+    }
+
+    // Crucial: only Pending requests can be edited. Approved or Rejected requests cannot be edited.
+    if (leaveRequest.status !== 'Pending') {
+      return res.status(400).json({ 
+        message: `This leave request has already been ${leaveRequest.status.toLowerCase()} and cannot be edited.` 
+      });
+    }
+
+    if (reason !== undefined) leaveRequest.reason = reason;
+    if (fromDate !== undefined) leaveRequest.fromDate = fromDate;
+    if (fromTime !== undefined) leaveRequest.fromTime = fromTime || '';
+    if (toDate !== undefined) leaveRequest.toDate = toDate;
+    if (toTime !== undefined) leaveRequest.toTime = toTime || '';
+    if (requestedDays !== undefined) leaveRequest.requestedDays = Number(requestedDays);
+    if (destination !== undefined) leaveRequest.destination = destination;
+    if (emergencyContact !== undefined) leaveRequest.emergencyContact = emergencyContact;
+
+    const updatedLeave = await leaveRequest.save();
+
+    if (req.app.locals.io) {
+      req.app.locals.io.emit('dashboard_update', { type: 'leave_updated' });
+    }
+
+    res.json(updatedLeave);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getLeaveRequests,
+  getLeaveRequestById,
   createLeaveRequest,
+  updateLeaveRequest,
   updateLeaveStatus
 };

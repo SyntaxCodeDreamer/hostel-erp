@@ -6,6 +6,14 @@ const leaderProfileSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  name: {
+    type: String,
+    default: ''
+  },
+  email: {
+    type: String,
+    default: ''
+  },
   role: {
     type: String,
     required: true

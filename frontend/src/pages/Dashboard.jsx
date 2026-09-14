@@ -7,7 +7,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import {
-  Users, Calendar, CheckSquare, Wallet, BookOpen, TrendingUp, Activity, Megaphone, Award, FileText, ExternalLink, Layers, RefreshCw, Clock
+  Users, Calendar, CheckSquare, Wallet, BookOpen, TrendingUp, Activity, Megaphone, Award, FileText, ExternalLink, Layers, Clock
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -35,8 +35,6 @@ const Dashboard = () => {
   const [data, setData] = useState(null);
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState(null);
   const [selectedCourseIndex, setSelectedCourseIndex] = useState(null);
 
   const isDark = theme === 'dark';
@@ -110,12 +108,6 @@ const Dashboard = () => {
       socket.off('new_notification', handleDashboardEvent);
     };
   }, [socket, fetchDashboardData]);
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await fetchDashboardData();
-    setTimeout(() => setIsRefreshing(false), 500);
-  };
 
   // Student view restriction removed so they can access the awesome dashboard widgets
 
@@ -205,26 +197,6 @@ const Dashboard = () => {
           <p className={`text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Here is a quick snapshot of the hostel operations today.</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap self-start sm:self-auto">
-          {/* Refresh Action Button */}
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition shadow-xs active:scale-95 cursor-pointer ${
-              isDark
-                ? 'bg-[#181a26] border-gray-700 text-gray-200 hover:bg-gray-800 hover:border-indigo-500/50'
-                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-indigo-300'
-            }`}
-            title="Refresh dashboard data"
-          >
-            <RefreshCw size={14} className={`${isRefreshing ? 'animate-spin text-indigo-500' : isDark ? 'text-gray-400' : 'text-gray-500'}`} />
-            <span>{isRefreshing ? 'Updating...' : 'Refresh'}</span>
-            {lastUpdated && (
-              <span className={`text-[10px] ml-1 font-normal opacity-70 hidden md:inline`}>
-                ({lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })})
-              </span>
-            )}
-          </button>
-
           <div className={`flex items-center gap-2 border px-4 py-2 rounded-xl text-xs font-semibold shadow-xs ${
             isDark ? 'bg-[#1a1c26] border-purple-900/50 text-purple-300' : 'bg-indigo-50 border-indigo-200 text-indigo-700'
           }`}>

@@ -3,7 +3,7 @@ import apiClient from '../utils/apiClient';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
-import { Calendar, Plus, MapPin, Search } from 'lucide-react';
+import { Calendar, Plus, MapPin, Search, Clock, Lock, Edit3 } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const Leaves = () => {
@@ -13,6 +13,7 @@ const Leaves = () => {
   const [statusFilter, setStatusFilter] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+  const [myStudentId, setMyStudentId] = useState('');
 
   const { user } = useContext(AuthContext);
   const { theme } = useContext(ThemeContext);
@@ -33,6 +34,15 @@ const Leaves = () => {
 
   useEffect(() => {
     fetchLeaves();
+    const fetchMyProfile = async () => {
+      try {
+        const { data } = await apiClient.get('/students/me');
+        if (data?._id) setMyStudentId(data._id);
+      } catch (err) {
+        // Non-student without profile
+      }
+    };
+    fetchMyProfile();
   }, []);
 
   const handleStatusUpdate = async (id, status) => {
@@ -48,6 +58,12 @@ const Leaves = () => {
     if (!dateStr) return 'N/A';
     const d = new Date(dateStr);
     return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString();
+  };
+
+  const formatTime = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   const calculateLeaveDays = (fromDateStr, toDateStr) => {
@@ -108,7 +124,7 @@ const Leaves = () => {
           <h1 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>Leaves</h1>
           <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Track and verify student resident out-of-hostel requests.</p>
         </div>
-        {(user?.role === 'Student' || user?.role === 'student') && (
+        {(['student', 'leader'].includes((user?.role || '').toLowerCase())) && (
           <Link 
             to="/leaves/request" 
             className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 transition flex items-center gap-1.5 shadow-sm"
@@ -157,13 +173,12 @@ const Leaves = () => {
               <thead className={isDark ? 'bg-[#1a1c26] divide-gray-800' : 'bg-gray-50 divide-gray-200 border-b border-gray-200'}>
                 <tr>
                   <th className={`px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Resident</th>
+                  <th className={`px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Applied On</th>
                   <th className={`px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Destination</th>
                   <th className={`px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Reason</th>
                   <th className={`px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Absence Period</th>
                   <th className={`px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Status</th>
-                  {isAdminOrLeader && (
-                    <th className={`px-6 py-3.5 text-center text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Actions</th>
-                  )}
+                  <th className={`px-6 py-3.5 text-center text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Actions</th>
                 </tr>
               </thead>
               <tbody className={`divide-y ${isDark ? 'divide-gray-800/40' : 'divide-gray-100'}`}>
@@ -177,6 +192,15 @@ const Leaves = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{sName}</div>
                         <div className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{room} {room ? '•' : ''} Emergency: {leave.emergencyContact || 'N/A'}</div>
+                      </td>
+                      <td className={`px-6 py-4 whitespace-nowrap text-xs ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <div className={`font-semibold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                          <Clock size={13} className="text-indigo-500 shrink-0" />
+                          <span>{formatDate(leave.appliedDate || leave.createdAt)}</span>
+                        </div>
+                        <div className="text-[11px] text-gray-400 dark:text-gray-500 pl-4 mt-0.5 font-medium">
+                          {formatTime(leave.appliedDate || leave.createdAt)}
+                        </div>
                       </td>
                       <td className={`px-6 py-4 whitespace-nowrap ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
                         <div className="flex items-center gap-1">
@@ -204,35 +228,86 @@ const Leaves = () => {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(leave.status)}
-                      </td>
-                      {isAdminOrLeader && (
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                          {statusLower === 'pending' && (
-                            <div className="flex justify-center space-x-2">
-                              <button 
-                                onClick={() => handleStatusUpdate(leave._id, 'Approved')} 
-                                className="bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-400 dark:border dark:border-emerald-800/50 dark:hover:bg-emerald-900 px-3 py-1 rounded-lg text-xs font-semibold transition"
-                              >
-                                Approve
-                              </button>
-                              <button 
-                                onClick={() => handleStatusUpdate(leave._id, 'Rejected')} 
-                                className="bg-rose-600 text-white hover:bg-rose-700 dark:bg-rose-950/80 dark:text-rose-400 dark:border dark:border-rose-800/50 dark:hover:bg-rose-900 px-3 py-1 rounded-lg text-xs font-semibold transition"
-                              >
-                                Reject
-                              </button>
+                      <td className="px-6 py-4 whitespace-nowrap text-xs">
+                        <div>{getStatusBadge(leave.status)}</div>
+                        {leave.reviewedBy && (statusLower === 'approved' || statusLower === 'rejected') && (
+                          <div className="mt-1.5 flex flex-col gap-0.5">
+                            <div className={`font-semibold flex items-center gap-1 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                              <span className="text-[11px] font-normal text-gray-500 dark:text-gray-400">By:</span>
+                              <span>{leave.reviewedBy.name || 'Admin'}</span>
+                              {leave.reviewedBy.role && (
+                                <span className="text-[10px] px-1.5 py-0.2 rounded-full font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700/60">
+                                  {leave.reviewedBy.role}
+                                </span>
+                              )}
                             </div>
-                          )}
-                        </td>
-                      )}
+                            {(leave.reviewedAt || leave.updatedAt) && (
+                              <div className="text-[10px] text-gray-400 dark:text-gray-500">
+                                {formatDate(leave.reviewedAt || leave.updatedAt)} {formatTime(leave.reviewedAt || leave.updatedAt)}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        {(() => {
+                          const isOwnLeave = (
+                            (myStudentId && (leave.studentId?._id === myStudentId || leave.studentId === myStudentId)) ||
+                            (user?._id && (leave.studentId?.userId?._id === user._id || leave.studentId?.userId === user._id))
+                          );
+
+                          if (isOwnLeave) {
+                            return statusLower === 'pending' ? (
+                              <Link 
+                                to={`/leaves/edit/${leave._id}`}
+                                className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition shadow-xs"
+                              >
+                                <Edit3 size={13} />
+                                <span>Edit</span>
+                              </Link>
+                            ) : (
+                              <span 
+                                className="inline-flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 font-medium bg-gray-100 dark:bg-gray-800/60 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700/50 cursor-not-allowed" 
+                                title={`This leave request has been ${statusLower} and cannot be edited`}
+                              >
+                                <Lock size={12} />
+                                <span>Locked</span>
+                              </span>
+                            );
+                          }
+
+                          if (isAdminOrLeader) {
+                            return statusLower === 'pending' ? (
+                              <div className="flex justify-center space-x-2">
+                                <button 
+                                  onClick={() => handleStatusUpdate(leave._id, 'Approved')} 
+                                  className="bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-400 dark:border dark:border-emerald-800/50 dark:hover:bg-emerald-900 px-3 py-1.5 rounded-lg text-xs font-semibold transition shadow-xs"
+                                >
+                                  Approve
+                                </button>
+                                <button 
+                                  onClick={() => handleStatusUpdate(leave._id, 'Rejected')} 
+                                  className="bg-rose-600 text-white hover:bg-rose-700 dark:bg-rose-950/80 dark:text-rose-400 dark:border dark:border-rose-800/50 dark:hover:bg-rose-900 px-3 py-1.5 rounded-lg text-xs font-semibold transition shadow-xs"
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-gray-400 dark:text-gray-500 font-medium italic">
+                                {leave.reviewedBy?.name ? `Reviewed by ${leave.reviewedBy.name}` : 'Decided'}
+                              </span>
+                            );
+                          }
+
+                          return null;
+                        })()}
+                      </td>
                     </tr>
                   );
                 })}
                 {filteredLeaves.length === 0 && (
                   <tr>
-                    <td colSpan={isAdminOrLeader ? 6 : 5} className={`px-6 py-8 text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <td colSpan={7} className={`px-6 py-8 text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                       No leave requests found.
                     </td>
                   </tr>

@@ -4,7 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { SocketContext } from '../context/SocketContext';
 import { usePush } from '../context/PushContext';
-import { Bell, Sun, Moon, Menu, X, BellRing, Smartphone, Send, Check, AlertCircle, RefreshCw } from 'lucide-react';
+import { Bell, Sun, Moon, Menu, X, BellRing, Smartphone, Send, Check, AlertCircle, RefreshCw, User } from 'lucide-react';
 import apiClient from '../utils/apiClient';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -149,6 +149,23 @@ const DashboardLayout = () => {
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
+  const getPageTitle = () => {
+    const path = location.pathname || '';
+    if (path === '/' || path === '/dashboard') return 'Dashboard';
+    if (path.startsWith('/leaves/edit')) return 'Edit Leave Request';
+    if (path === '/leaves/request') return 'Request Leave';
+    if (path.startsWith('/leaves')) return 'Leaves';
+    if (path === '/students/add') return 'Add Student';
+    if (path.startsWith('/students')) return 'Students';
+    if (path.startsWith('/tasks')) return 'Tasks';
+    if (path.startsWith('/announcements')) return 'Announcements';
+    if (path.startsWith('/trust-members')) return 'Trust Members';
+    if (path.startsWith('/expenses')) return 'Expenses';
+
+    const segment = path.replace(/^\//, '').split('/')[0];
+    return segment ? segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, ' ') : 'Dashboard';
+  };
+
   return (
     <div className={`flex h-screen font-sans transition-colors duration-200 ${isDark ? 'bg-[#090a0f] text-gray-100' : 'bg-gray-50 text-gray-800'}`}>
       
@@ -273,7 +290,7 @@ const DashboardLayout = () => {
               <Menu size={24} />
             </button>
             <h2 className="text-xl font-semibold">
-              {location.pathname === '/' ? 'Dashboard' : location.pathname.substring(1).charAt(0).toUpperCase() + location.pathname.slice(2).replace('-', ' ')}
+              {getPageTitle()}
             </h2>
           </div>
           <div className="flex items-center space-x-4 sm:space-x-6">
@@ -387,6 +404,20 @@ const DashboardLayout = () => {
                       <p className="text-sm font-bold truncate">{user?.name}</p>
                       <p className="text-xs text-indigo-500 font-semibold truncate">{user?.role}</p>
                     </div>
+                    {['student', 'leader'].includes((user?.role || '').toLowerCase()) && (
+                      <button 
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          navigate('/students?view=me');
+                        }}
+                        className={`w-full text-left px-4 py-2.5 text-sm font-medium transition flex items-center gap-2 ${
+                          isDark ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-50 text-gray-700'
+                        }`}
+                      >
+                        <User size={15} className="text-indigo-500" />
+                        My Student Profile
+                      </button>
+                    )}
                     <button 
                       onClick={() => {
                         setShowProfileMenu(false);

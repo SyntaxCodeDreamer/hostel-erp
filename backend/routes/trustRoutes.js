@@ -6,6 +6,7 @@ const {
   deleteTrustMember,
   getLeaders,
   createLeader,
+  updateLeader,
   deleteLeader
 } = require('../controllers/trustController');
 const { protect, authorize } = require('../middleware/authMiddleware');
@@ -26,6 +27,7 @@ router.route('/leaders')
   .post(authorize('Admin', 'admin'), createLeader);
 
 router.route('/leaders/:id')
+  .put(authorize('Admin', 'admin'), updateLeader)
   .delete(authorize('Admin', 'admin'), deleteLeader);
 
 module.exports = router;

@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useContext, useMemo } from 'react';
 import apiClient from '../utils/apiClient';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
-import { Eye, X, Phone, MapPin, GraduationCap, Edit3, Save, CheckCircle, ExternalLink, Link as LinkIcon, TrendingUp, Plus, Trash2, Award, FileText, Search, ShieldCheck, CheckCircle2, FileSpreadsheet, Upload } from 'lucide-react';
+import { Eye, X, Phone, MapPin, GraduationCap, Edit3, Save, CheckCircle, ExternalLink, Link as LinkIcon, TrendingUp, Plus, Trash2, Award, FileText, Search, ShieldCheck, CheckCircle2, FileSpreadsheet, Upload, User } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import * as XLSX from 'xlsx';
 
@@ -19,6 +19,7 @@ const Students = () => {
   const { user } = useContext(AuthContext);
   const { theme } = useContext(ThemeContext);
   const isDark = theme === 'dark';
+  const location = useLocation();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -168,9 +169,26 @@ const Students = () => {
 
   const [totalStudentsCount, setTotalStudentsCount] = useState(0);
 
+  const handleOpenMyProfile = async () => {
+    try {
+      setLoading(true);
+      const { data: myProfile } = await apiClient.get('/students/me');
+      if (myProfile) {
+        handleViewProfile(myProfile);
+      }
+    } catch (err) {
+      console.error('Error fetching own student profile:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchStudents(currentPage, searchQuery);
-  }, [currentPage, searchQuery]);
+    if (isLeader && location.search.includes('view=me')) {
+      handleOpenMyProfile();
+    }
+  }, [currentPage, searchQuery, location.search]);
 
   const fetchStudents = async (page = currentPage, search = searchQuery) => {
     try {
@@ -501,16 +519,25 @@ const Students = () => {
           <h1 className="text-2xl font-bold tracking-tight">{isStudent ? 'My Student Profile' : 'Students'}</h1>
           <p className="text-sm opacity-70">{isStudent ? 'View and update your personal hostel details' : 'Manage and track student resident records.'}</p>
         </div>
-        {isAdmin && (
-          <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {isLeader && (
+            <button
+              onClick={handleOpenMyProfile}
+              className="bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+            >
+              <User size={15} />
+              My Student Profile
+            </button>
+          )}
+          {isAdmin && (
             <Link 
               to="/students/add" 
               className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-700 transition shadow-sm"
             >
               + Add Student
             </Link>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {saveSuccess && (

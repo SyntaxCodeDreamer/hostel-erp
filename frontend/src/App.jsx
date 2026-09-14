@@ -50,7 +50,12 @@ function App() {
                     } />
                     <Route path="leaves" element={<Leaves />} />
                     <Route path="leaves/request" element={
-                      <ProtectedRoute allowedRoles={['Student']}>
+                      <ProtectedRoute allowedRoles={['Student', 'Leader']}>
+                        <LeaveRequestForm />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="leaves/edit/:id" element={
+                      <ProtectedRoute allowedRoles={['Student', 'Leader']}>
                         <LeaveRequestForm />
                       </ProtectedRoute>
                     } />

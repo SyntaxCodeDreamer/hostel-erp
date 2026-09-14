@@ -20,6 +20,7 @@ const studentSchema = new mongoose.Schema({
     required: true
   },
   fullName: { type: String },
+  email: { type: String, default: '' },
   village: { type: String, required: true },
   homeAddress: { type: String, required: true },
   course: { type: String, required: true },

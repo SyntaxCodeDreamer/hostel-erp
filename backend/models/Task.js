@@ -14,6 +14,14 @@ const taskSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  assignedToName: {
+    type: String,
+    default: ''
+  },
+  assignedToEmail: {
+    type: String,
+    default: ''
+  },
   priority: {
     type: String,
     enum: ['Low', 'Medium', 'High'],
@@ -32,6 +40,10 @@ const taskSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
+  },
+  createdByName: {
+    type: String,
+    default: ''
   },
   overdueNotified: {
     type: Boolean,

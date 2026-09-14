@@ -146,7 +146,28 @@ const getMyStudentProfile = async (req, res) => {
   try {
     let student = await Student.findOne({ userId: req.user._id }).populate('userId', 'name email profileImage').lean();
     if (!student) {
-      return res.status(404).json({ message: 'Student profile not found' });
+      const userRole = (req.user.role || '').toLowerCase();
+      if (userRole === 'student' || userRole === 'leader') {
+        const newStudent = new Student({
+          userId: req.user._id,
+          fullName: req.user.name || (userRole === 'leader' ? 'Student Leader' : 'Student Resident'),
+          village: 'N/A',
+          homeAddress: 'N/A',
+          course: 'N/A',
+          collegeName: 'N/A',
+          joiningYear: new Date().getFullYear(),
+          joiningMonth: 'August',
+          mobile: 'N/A',
+          parentsMobile: 'N/A',
+          drivingLicense: false,
+          roomNumber: 'Unassigned',
+          status: 'Available'
+        });
+        await newStudent.save();
+        student = await Student.findById(newStudent._id).populate('userId', 'name email profileImage').lean();
+      } else {
+        return res.status(404).json({ message: 'Student profile not found' });
+      }
     }
     await syncBulkStudentLeaveStatus([student]);
     res.json(student);
