@@ -1,6 +1,62 @@
 const User = require('../models/User');
+const LeaderProfile = require('../models/LeaderProfile');
+const TrustMember = require('../models/TrustMember');
+const Student = require('../models/Student');
 const generateToken = require('../utils/generateToken');
 const { sendWelcomeEmail, getBrevoDefaultPassword } = require('../utils/sendEmail');
+
+// Helper to find or auto-heal/recreate User record from directory profiles
+const findOrSyncUserByEmail = async (cleanEmail) => {
+  let user = await User.findOne({ email: { $regex: new RegExp('^' + cleanEmail + '$', 'i') } });
+  if (user) return user;
+
+  // Check if user exists in LeaderProfile
+  const leader = await LeaderProfile.findOne({ email: { $regex: new RegExp('^' + cleanEmail + '$', 'i') } });
+  if (leader) {
+    const defaultPass = getBrevoDefaultPassword(leader.email);
+    user = await User.create({
+      name: leader.name || 'Leader',
+      email: leader.email.toLowerCase().trim(),
+      password: defaultPass,
+      role: 'Leader'
+    });
+    leader.userId = user._id;
+    await leader.save();
+    return user;
+  }
+
+  // Check if user exists in TrustMember
+  const trustee = await TrustMember.findOne({ email: { $regex: new RegExp('^' + cleanEmail + '$', 'i') } });
+  if (trustee) {
+    const defaultPass = getBrevoDefaultPassword(trustee.email);
+    user = await User.create({
+      name: trustee.name || 'Trust Member',
+      email: trustee.email.toLowerCase().trim(),
+      password: defaultPass,
+      role: trustee.role || 'Trustee'
+    });
+    trustee.userId = user._id;
+    await trustee.save();
+    return user;
+  }
+
+  // Check if user exists in Student
+  const student = await Student.findOne({ email: { $regex: new RegExp('^' + cleanEmail + '$', 'i') } });
+  if (student) {
+    const defaultPass = getBrevoDefaultPassword(student.email);
+    user = await User.create({
+      name: student.fullName || 'Student',
+      email: student.email.toLowerCase().trim(),
+      password: defaultPass,
+      role: 'Student'
+    });
+    student.userId = user._id;
+    await student.save();
+    return user;
+  }
+
+  return null;
+};
 
 // @desc    Auth user & get token
 // @route   POST /api/auth/login
@@ -14,8 +70,8 @@ const login = async (req, res) => {
     }
 
     const cleanEmail = email.trim();
-    // Case-insensitive query for robust email login matching
-    const user = await User.findOne({ email: { $regex: new RegExp('^' + cleanEmail + '$', 'i') } });
+    // Case-insensitive query with auto-healing from directory profiles
+    const user = await findOrSyncUserByEmail(cleanEmail);
 
     if (user && (await user.matchPassword(password.trim()))) {
       res.json({
@@ -34,6 +90,7 @@ const login = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
@@ -128,9 +185,143 @@ const changePassword = async (req, res) => {
   }
 };
 
+// @desc    Self-service password reset (Direct formula or custom password, zero emails)
+// @route   POST /api/auth/forgot-password
+// @access  Public
+const forgotPassword = async (req, res) => {
+  const { email, newPassword, resetToDefault = true } = req.body;
+
+  try {
+    if (!email || !email.trim()) {
+      return res.status(400).json({ message: 'Please enter your registered email address' });
+    }
+
+    const cleanEmail = email.trim();
+    const user = await findOrSyncUserByEmail(cleanEmail);
+
+    if (!user) {
+      return res.status(404).json({ message: 'No account found with this email address' });
+    }
+
+    let finalPassword = '';
+    if (resetToDefault || !newPassword) {
+      finalPassword = getBrevoDefaultPassword(user.email);
+    } else {
+      if (newPassword.trim().length < 6) {
+        return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+      }
+      finalPassword = newPassword.trim();
+    }
+
+    user.password = finalPassword;
+    user.resetPasswordOtp = null;
+    user.resetPasswordExpire = null;
+    await user.save();
+
+    res.json({ 
+      message: `Password successfully updated in database! You can now log in.`,
+      password: finalPassword,
+      email: user.email,
+      isDefaultFormula: !!(resetToDefault || !newPassword)
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ message: 'Failed to process password reset request' });
+  }
+};
+
+
+
+// @desc    Reset password using 6-digit OTP code
+// @route   POST /api/auth/reset-password
+// @access  Public
+const resetPasswordWithOtp = async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+
+  try {
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ message: 'Email, verification code, and new password are required' });
+    }
+
+    if (newPassword.trim().length < 6) {
+      return res.status(400).json({ message: 'New password must be at least 6 characters long' });
+    }
+
+    const cleanEmail = email.trim();
+    const cleanOtp = otp.toString().trim();
+
+    const user = await User.findOne({
+      email: { $regex: new RegExp('^' + cleanEmail + '$', 'i') },
+      resetPasswordOtp: cleanOtp,
+      resetPasswordExpire: { $gt: new Date() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired verification code. Please request a new one.' });
+    }
+
+    // Update password (pre-save hook will automatically hash it with bcrypt)
+    user.password = newPassword.trim();
+    user.resetPasswordOtp = null;
+    user.resetPasswordExpire = null;
+    await user.save();
+
+    res.json({ message: 'Password has been reset successfully! You can now log in.' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ message: 'Failed to reset password' });
+  }
+};
+
+// @desc    Admin reset user password (custom or default formula)
+// @route   POST /api/auth/admin-reset-password
+// @access  Private (Admin only)
+const adminResetPassword = async (req, res) => {
+  const { targetUserId, newPassword, resetToDefault, notifyUser = true } = req.body;
+
+  try {
+    if (!targetUserId) {
+      return res.status(400).json({ message: 'Target user ID is required' });
+    }
+
+    const targetUser = await User.findById(targetUserId);
+    if (!targetUser) {
+      return res.status(404).json({ message: 'Target user account not found' });
+    }
+
+    let finalPassword = '';
+    if (resetToDefault) {
+      finalPassword = getBrevoDefaultPassword(targetUser.email);
+    } else {
+      if (!newPassword || newPassword.trim().length < 6) {
+        return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+      }
+      finalPassword = newPassword.trim();
+    }
+
+    targetUser.password = finalPassword;
+    targetUser.resetPasswordOtp = null;
+    targetUser.resetPasswordExpire = null;
+    await targetUser.save();
+
+    res.json({
+      message: `Password for ${targetUser.name} (${targetUser.email}) was reset successfully.`,
+      email: targetUser.email,
+      isDefaultFormula: !!resetToDefault,
+      newPassword: finalPassword
+    });
+  } catch (error) {
+    console.error('Admin reset password error:', error);
+    res.status(500).json({ message: 'Failed to reset user password' });
+  }
+};
+
 module.exports = {
   login,
   register,
   getProfile,
-  changePassword
+  changePassword,
+  forgotPassword,
+  resetPasswordWithOtp,
+  adminResetPassword
 };

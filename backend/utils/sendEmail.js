@@ -157,3 +157,4 @@ module.exports = {
   getBrevoDefaultPassword,
   sendWelcomeEmail
 };
+

@@ -3,8 +3,9 @@ import apiClient from '../utils/apiClient';
 import { Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
-import { Eye, X, Phone, MapPin, GraduationCap, Edit3, Save, CheckCircle, ExternalLink, Link as LinkIcon, TrendingUp, Plus, Trash2, Award, FileText, Search, ShieldCheck, CheckCircle2, FileSpreadsheet, Upload, User } from 'lucide-react';
+import { Eye, X, Phone, MapPin, GraduationCap, Edit3, Save, CheckCircle, ExternalLink, Link as LinkIcon, TrendingUp, Plus, Trash2, Award, FileText, Search, ShieldCheck, CheckCircle2, FileSpreadsheet, Upload, User, KeyRound } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
+import AdminResetPasswordModal from '../components/AdminResetPasswordModal';
 import * as XLSX from 'xlsx';
 
 const Students = () => {
@@ -16,6 +17,7 @@ const Students = () => {
   const [saveSuccess, setSaveSuccess] = useState('');
   const [studentLeaveCount, setStudentLeaveCount] = useState(0);
   const [leavesList, setLeavesList] = useState([]);
+  const [resetModalUser, setResetModalUser] = useState(null);
   const { user } = useContext(AuthContext);
   const { theme } = useContext(ThemeContext);
   const isDark = theme === 'dark';
@@ -1135,19 +1137,40 @@ const Students = () => {
                               View Profile
                             </button>
                             {isAdmin && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteStudent(student._id);
-                                }}
-                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
-                                  isDark ? 'bg-rose-950/60 text-rose-300 border-rose-800/50 hover:bg-rose-900/80' : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
-                                }`}
-                                title="Delete Student"
-                              >
-                                <Trash2 size={14} />
-                                Delete
-                              </button>
+                              <>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const targetUserId = student.userId?._id || student.userId || student._id;
+                                    setResetModalUser({
+                                      id: targetUserId,
+                                      name: getStudentName(student),
+                                      email: getStudentEmail(student),
+                                      role: student.userId?.role || 'Student'
+                                    });
+                                  }}
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
+                                    isDark ? 'bg-amber-950/60 text-amber-300 border-amber-800/50 hover:bg-amber-900/80' : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                                  }`}
+                                  title="Reset Password"
+                                >
+                                  <KeyRound size={14} />
+                                  Reset Pass
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteStudent(student._id);
+                                  }}
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
+                                    isDark ? 'bg-rose-950/60 text-rose-300 border-rose-800/50 hover:bg-rose-900/80' : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                                  }`}
+                                  title="Delete Student"
+                                >
+                                  <Trash2 size={14} />
+                                  Delete
+                                </button>
+                              </>
                             )}
                           </div>
                         </td>
@@ -1248,6 +1271,24 @@ const Students = () => {
               </div>
 
               <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      const targetUserId = selectedStudent.userId?._id || selectedStudent.userId || selectedStudent._id;
+                      setResetModalUser({
+                        id: targetUserId,
+                        name: getStudentName(selectedStudent),
+                        email: getStudentEmail(selectedStudent),
+                        role: selectedStudent.userId?.role || 'Student'
+                      });
+                    }}
+                    className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/30 px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1 shadow-xs"
+                    title="Reset Password"
+                  >
+                    <KeyRound size={14} />
+                    Reset Password
+                  </button>
+                )}
                 {!isEditing && (isAdmin || isLeader) && (
                   <button
                     onClick={() => setIsEditing(true)}
@@ -1779,6 +1820,13 @@ const Students = () => {
           </div>
         </div>
       )}
+
+      {/* Admin Reset Password Modal */}
+      <AdminResetPasswordModal
+        isOpen={!!resetModalUser}
+        onClose={() => setResetModalUser(null)}
+        targetUser={resetModalUser}
+      />
     </div>
   );
 };

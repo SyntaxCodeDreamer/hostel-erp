@@ -2,7 +2,8 @@ import React, { useState, useEffect, useContext } from 'react';
 import apiClient from '../utils/apiClient';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
-import { ShieldAlert, UserCheck, Plus, Trash2, Phone, Mail } from 'lucide-react';
+import { ShieldAlert, UserCheck, Plus, Trash2, Phone, Mail, KeyRound } from 'lucide-react';
+import AdminResetPasswordModal from '../components/AdminResetPasswordModal';
 
 const TrustLeader = () => {
   const { user } = useContext(AuthContext);
@@ -17,6 +18,7 @@ const TrustLeader = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [memberData, setMemberData] = useState({ name: '', email: '', position: '', contactNumber: '', joiningDate: new Date().toISOString().split('T')[0] });
   const [leaderData, setLeaderData] = useState({ name: '', email: '', password: '', role: 'Leader', contactNumber: '', duration: '' });
+  const [resetModalUser, setResetModalUser] = useState(null);
 
   const userRoleLower = (user?.role || '').toLowerCase();
   const isAdmin = userRoleLower === 'admin';
@@ -314,9 +316,23 @@ const TrustLeader = () => {
                     <td className={`p-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{leader.contactNumber || 'N/A'}</td>
                     {isAdmin && (
                       <td className="p-4 text-center">
-                        <button onClick={() => handleDeleteLeader(leader._id)} className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition p-1" title="Remove">
-                          <Trash2 size={16} />
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button 
+                            onClick={() => setResetModalUser({
+                              id: leader.userId?._id || leader.userId,
+                              name: leader.userId?.name || leader.name || 'Leader',
+                              email: leader.userId?.email || leader.email || '',
+                              role: leader.role || 'Leader'
+                            })} 
+                            className="text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300 transition p-1.5 rounded-lg hover:bg-amber-500/10" 
+                            title="Reset Password"
+                          >
+                            <KeyRound size={16} />
+                          </button>
+                          <button onClick={() => handleDeleteLeader(leader._id)} className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition p-1.5 rounded-lg hover:bg-red-500/10" title="Remove">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -335,6 +351,12 @@ const TrustLeader = () => {
         </div>
       </div>
 
+      {/* Admin Reset Password Modal */}
+      <AdminResetPasswordModal
+        isOpen={!!resetModalUser}
+        onClose={() => setResetModalUser(null)}
+        targetUser={resetModalUser}
+      />
     </div>
   );
 };
