@@ -125,67 +125,12 @@ const LeaveRequestForm = () => {
     initForm();
   }, [id, isEditMode]);
 
-  const addDaysToDate = (dateStr, days) => {
-    if (!dateStr || isNaN(days) || days <= 0) return '';
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return '';
-    d.setDate(d.getDate() + (days - 1));
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  };
-
   const handleChange = (e) => {
     if (isLocked) return;
     const { name, value } = e.target;
-    setFormData(prev => {
-      const nextForm = { ...prev, [name]: value };
-
-      if (name === 'requestedDays') {
-        const numDays = parseInt(value, 10);
-        if (!isNaN(numDays) && numDays > 0 && nextForm.fromDate) {
-          const newToDate = addDaysToDate(nextForm.fromDate, numDays);
-          if (newToDate) {
-            nextForm.toDate = newToDate;
-          }
-        }
-      } else if (name === 'fromDate') {
-        const from = value;
-        const numDays = parseInt(prev.requestedDays, 10);
-        if (from && !isNaN(numDays) && numDays > 0) {
-          const newToDate = addDaysToDate(from, numDays);
-          if (newToDate) {
-            nextForm.toDate = newToDate;
-          }
-        } else if (from && nextForm.toDate) {
-          const f = new Date(from);
-          const t = new Date(nextForm.toDate);
-          if (!isNaN(f.getTime()) && !isNaN(t.getTime()) && t >= f) {
-            const diff = Math.abs(t - f);
-            const calcDays = Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1;
-            nextForm.requestedDays = calcDays.toString();
-          }
-        }
-      } else if (name === 'toDate') {
-        const to = value;
-        const from = nextForm.fromDate;
-        if (from && to) {
-          const f = new Date(from);
-          const t = new Date(to);
-          if (!isNaN(f.getTime()) && !isNaN(t.getTime())) {
-            const diff = t - f;
-            if (diff >= 0) {
-              const calcDays = Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1;
-              nextForm.requestedDays = calcDays.toString();
-            }
-          }
-        }
-      }
-
-      return nextForm;
-    });
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -388,7 +333,7 @@ const LeaveRequestForm = () => {
             <input 
               type="number" 
               name="requestedDays" 
-              min="1"
+              min="0"
               value={formData.requestedDays} 
               onChange={handleChange} 
               disabled={isLocked}

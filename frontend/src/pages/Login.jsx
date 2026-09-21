@@ -366,21 +366,16 @@ const Login = () => {
                     className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 text-xs tracking-wider uppercase transition shadow-lg disabled:opacity-50"
                   >
                     {resettingPassword ? (
-                      'Updating Database...'
+                      'Updating Password...'
                     ) : (
                       <>
                         <KeyRound size={14} />
-                        <span>Update Password in Database & Sign In</span>
+                        <span>Update Password</span>
                       </>
                     )}
                   </button>
                 </div>
               </form>
-
-              {/* Note */}
-              <p className="text-[11px] text-gray-500 text-center leading-relaxed">
-                This updates your login credentials directly in the database without dispatching any emails.
-              </p>
             </motion.div>
           </div>
         )}

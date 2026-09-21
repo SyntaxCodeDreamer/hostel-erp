@@ -41,17 +41,38 @@ const syncBulkStudentLeaveStatus = async (students) => {
         continue;
       }
 
-      const isOnLeave = onLeaveSet.has(student._id.toString());
-      const expectedStatus = isOnLeave ? 'On Leave' : 'Available';
+      const hasActiveLeaveRequest = onLeaveSet.has(student._id.toString());
 
-      if (student.status !== expectedStatus) {
-        student.status = expectedStatus;
-        bulkOps.push({
-          updateOne: {
-            filter: { _id: student._id },
-            update: { $set: { status: expectedStatus } }
-          }
-        });
+      if (hasActiveLeaveRequest) {
+        // Automatically put student on leave during their approved leave request window
+        if (student.status !== 'On Leave') {
+          student.status = 'On Leave';
+          bulkOps.push({
+            updateOne: {
+              filter: { _id: student._id },
+              update: { $set: { status: 'On Leave' } }
+            }
+          });
+        }
+      } else {
+        // No active approved leave request right now.
+        // If an Admin or Leader manually set the student to 'On Leave' (or student.isManualStatus is true),
+        // PRESERVE the manual status! Do NOT revert!
+        if (student.isManualStatus) {
+          continue;
+        }
+
+        // If the student was automatically set 'On Leave' from a past leave request that has now ended,
+        // and it was NOT a manual override, return to 'Available'
+        if (student.status === 'On Leave' && !student.isManualStatus) {
+          student.status = 'Available';
+          bulkOps.push({
+            updateOne: {
+              filter: { _id: student._id },
+              update: { $set: { status: 'Available' } }
+            }
+          });
+        }
       }
     }
 
@@ -318,7 +339,13 @@ const updateStudent = async (req, res) => {
       }
       if (req.body.resultUrls !== undefined) student.resultUrls = req.body.resultUrls;
       if (req.body.progressItems !== undefined) student.progressItems = req.body.progressItems;
-      if (req.body.status && userRole !== 'student') student.status = req.body.status;
+      if (req.body.status && userRole !== 'student') {
+        student.status = req.body.status;
+        student.isManualStatus = req.body.status === 'On Leave';
+      }
+      if (req.body.isManualStatus !== undefined && userRole !== 'student') {
+        student.isManualStatus = !!req.body.isManualStatus;
+      }
 
       const updatedStudent = await student.save();
       res.json(updatedStudent);

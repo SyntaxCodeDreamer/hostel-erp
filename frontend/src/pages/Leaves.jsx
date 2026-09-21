@@ -219,7 +219,9 @@ const Leaves = () => {
                         </div>
                         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                           <span className="inline-flex items-center gap-1 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 px-2.5 py-0.5 rounded-full text-[11px] font-bold">
-                            {leave.requestedDays !== undefined && leave.requestedDays !== null && leave.requestedDays !== '' ? leave.requestedDays : calculateLeaveDays(leave.fromDate, leave.toDate)} {(Number(leave.requestedDays || calculateLeaveDays(leave.fromDate, leave.toDate))) === 1 ? 'Day' : 'Days'} Requested
+                            {leave.requestedDays !== undefined && leave.requestedDays !== null && leave.requestedDays !== '' 
+                              ? `${leave.requestedDays} ${Number(leave.requestedDays) === 1 ? 'Day' : 'Days'}`
+                              : `${calculateLeaveDays(leave.fromDate, leave.toDate)} Days`} Requested
                           </span>
                           {leave.previousLeaveDays !== undefined && leave.previousLeaveDays !== null && leave.previousLeaveDays !== '' && (
                             <span className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full text-[11px] font-semibold">

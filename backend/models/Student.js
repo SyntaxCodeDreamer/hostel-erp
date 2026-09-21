@@ -38,6 +38,10 @@ const studentSchema = new mongoose.Schema({
     enum: ['Active', 'Available', 'On Leave', 'In-Active', 'Inactive', 'Left'],
     default: 'Available'
   },
+  isManualStatus: {
+    type: Boolean,
+    default: false
+  },
   leaveCount: {
     type: Number,
     default: 0

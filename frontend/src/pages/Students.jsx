@@ -3,7 +3,7 @@ import apiClient from '../utils/apiClient';
 import { Link, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
-import { Eye, X, Phone, MapPin, GraduationCap, Edit3, Save, CheckCircle, ExternalLink, Link as LinkIcon, TrendingUp, Plus, Trash2, Award, FileText, Search, ShieldCheck, CheckCircle2, FileSpreadsheet, Upload, User, KeyRound } from 'lucide-react';
+import { Eye, X, Phone, MapPin, GraduationCap, Edit3, Save, CheckCircle, ExternalLink, Link as LinkIcon, TrendingUp, Plus, Trash2, Award, FileText, Search, ShieldCheck, CheckCircle2, FileSpreadsheet, Upload, User, KeyRound, Calendar, Clock } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import AdminResetPasswordModal from '../components/AdminResetPasswordModal';
 import * as XLSX from 'xlsx';
@@ -307,8 +307,12 @@ const Students = () => {
   const handleStatusChange = async (newStatus) => {
     if (!selectedStudent) return;
     try {
-      await apiClient.put(`/students/${selectedStudent._id}`, { status: newStatus });
-      setSelectedStudent({ ...selectedStudent, status: newStatus });
+      const isManual = newStatus === 'On Leave';
+      await apiClient.put(`/students/${selectedStudent._id}`, { 
+        status: newStatus,
+        isManualStatus: isManual
+      });
+      setSelectedStudent({ ...selectedStudent, status: newStatus, isManualStatus: isManual });
       fetchStudents();
     } catch (err) {
       console.error('Error updating status:', err);
@@ -414,6 +418,8 @@ const Students = () => {
   const getStudentStatus = (student) => {
     const raw = (student?.status || 'Available').toString();
     if (raw.toLowerCase() === 'in-active' || raw.toLowerCase() === 'inactive' || raw.toLowerCase() === 'left') return 'In-Active';
+    // Respect explicit/manual 'On Leave' status
+    if (raw.toLowerCase() === 'on leave' || raw.toLowerCase() === 'onleave') return 'On Leave';
     
     // Check real-time active status against leaving time
     if (isStudentOnActiveLeave(student)) {
@@ -421,6 +427,111 @@ const Students = () => {
     }
     
     return 'Available';
+  };
+
+  const formatDateTimeDisplay = (dateObj) => {
+    if (!dateObj || isNaN(dateObj.getTime())) return '';
+    const dateStr = dateObj.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+    const timeStr = dateObj.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+    return `${dateStr} at ${timeStr}`;
+  };
+
+  const getStudentLeaveSchedule = (student) => {
+    if (!student) return null;
+    const studentIdStr = (student._id || student.id || '').toString();
+    const studentLeaves = (Array.isArray(leavesList) ? leavesList : []).filter((l) => {
+      const lStudentId = (l.studentId?._id || l.studentId || '').toString();
+      return lStudentId === studentIdStr;
+    });
+
+    const now = new Date();
+    const approved = studentLeaves.filter((l) => (l.status || '').toLowerCase() === 'approved');
+
+    // 1. Currently active approved leave
+    const active = approved.find((l) => {
+      const start = parseLeaveStartDateTime(l.fromDate, l.fromTime);
+      const end = parseLeaveEndDateTime(l.toDate, l.toTime);
+      return start && end && now >= start && now <= end;
+    });
+
+    if (active) {
+      const start = parseLeaveStartDateTime(active.fromDate, active.fromTime);
+      const end = parseLeaveEndDateTime(active.toDate, active.toTime);
+      return {
+        type: 'active',
+        badge: 'Currently On Leave',
+        title: 'Active Leave',
+        departureText: formatDateTimeDisplay(start),
+        returnText: formatDateTimeDisplay(end),
+        departureDateAndTime: `Departed: ${formatDateTimeDisplay(start)}`,
+        returnDateAndTime: `Expected Return: ${formatDateTimeDisplay(end)}`,
+        reason: active.reason || '',
+        destination: active.destination || '',
+        emergencyContact: active.emergencyContact || ''
+      };
+    }
+
+    // 2. Upcoming approved leave
+    const upcomingList = approved
+      .map((l) => ({
+        leave: l,
+        start: parseLeaveStartDateTime(l.fromDate, l.fromTime),
+        end: parseLeaveEndDateTime(l.toDate, l.toTime)
+      }))
+      .filter((item) => item.start && item.start > now)
+      .sort((a, b) => a.start - b.start);
+
+    if (upcomingList.length > 0) {
+      const up = upcomingList[0];
+      return {
+        type: 'upcoming',
+        badge: 'Upcoming Leave',
+        title: 'Upcoming Leave Scheduled',
+        departureText: formatDateTimeDisplay(up.start),
+        returnText: formatDateTimeDisplay(up.end),
+        departureDateAndTime: `Leaves on: ${formatDateTimeDisplay(up.start)}`,
+        returnDateAndTime: `Expected Return: ${formatDateTimeDisplay(up.end)}`,
+        reason: up.leave.reason || '',
+        destination: up.leave.destination || '',
+        emergencyContact: up.leave.emergencyContact || ''
+      };
+    }
+
+    // 3. Pending leave request
+    const pendingList = studentLeaves
+      .filter((l) => (l.status || '').toLowerCase() === 'pending')
+      .map((l) => ({
+        leave: l,
+        start: parseLeaveStartDateTime(l.fromDate, l.fromTime),
+        end: parseLeaveEndDateTime(l.toDate, l.toTime)
+      }))
+      .sort((a, b) => (a.start || 0) - (b.start || 0));
+
+    if (pendingList.length > 0) {
+      const pen = pendingList[0];
+      return {
+        type: 'pending',
+        badge: 'Pending Request',
+        title: 'Leave Request Pending Review',
+        departureText: formatDateTimeDisplay(pen.start),
+        returnText: formatDateTimeDisplay(pen.end),
+        departureDateAndTime: `Requested Departure: ${formatDateTimeDisplay(pen.start)}`,
+        returnDateAndTime: `Requested Return: ${formatDateTimeDisplay(pen.end)}`,
+        reason: pen.leave.reason || '',
+        destination: pen.leave.destination || '',
+        emergencyContact: pen.leave.emergencyContact || ''
+      };
+    }
+
+    return null;
   };
 
 
@@ -727,6 +838,56 @@ const Students = () => {
               ) : (
                 /* READ ONLY PROFILE VIEW */
                 <>
+                  {/* Leave Schedule Card for Student View */}
+                  {(() => {
+                    const sched = getStudentLeaveSchedule(selectedStudent);
+                    if (!sched) return null;
+                    return (
+                      <div className={`mb-4 p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+                        sched.type === 'active' || sched.type === 'upcoming'
+                          ? isDark ? 'bg-amber-950/40 border-amber-800/60 text-amber-200' : 'bg-amber-50/90 border-amber-200 text-amber-950'
+                          : sched.type === 'pending'
+                          ? isDark ? 'bg-indigo-950/40 border-indigo-800/60 text-indigo-200' : 'bg-indigo-50/90 border-indigo-200 text-indigo-950'
+                          : isDark ? 'bg-gray-900/60 border-gray-800 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-800'
+                      }`}>
+                        <div className="flex items-start gap-3 min-w-0">
+                          <div className={`p-2.5 rounded-xl shrink-0 ${
+                            sched.type === 'active' || sched.type === 'upcoming'
+                              ? 'bg-amber-500/20 text-amber-400'
+                              : 'bg-indigo-500/20 text-indigo-400'
+                          }`}>
+                            <Calendar size={20} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold uppercase tracking-wider">{sched.title}</span>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase border ${
+                                sched.type === 'active' || sched.type === 'upcoming'
+                                  ? 'bg-amber-950/80 border-amber-700/60 text-amber-300'
+                                  : 'bg-indigo-950/80 border-indigo-700/60 text-indigo-300'
+                              }`}>
+                                {sched.badge}
+                              </span>
+                            </div>
+                            <div className="text-sm font-bold mt-1">
+                              {sched.departureDateAndTime}
+                            </div>
+                            {sched.returnDateAndTime && (
+                              <div className="text-xs font-medium opacity-90 mt-0.5">
+                                {sched.returnDateAndTime}
+                              </div>
+                            )}
+                            {sched.reason && (
+                              <div className="text-xs mt-1.5 opacity-80 italic">
+                                Reason: "{sched.reason}" {sched.destination ? `• Destination: ${sched.destination}` : ''}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Grid 1: Academic & Course */}
                   <div>
                     <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5 ${isDark ? 'text-gray-400' : 'text-slate-900'}`}>
@@ -1115,15 +1276,31 @@ const Students = () => {
                         </td>
                         <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{sMobile}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2.5 py-1 inline-flex text-xs font-semibold rounded-full ${
-                            sStatus === 'Available' || sStatus === 'Active' 
-                              ? isDark ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/50' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                              : sStatus === 'On Leave' || sStatus === 'On leave'
-                              ? isDark ? 'bg-amber-950/80 text-amber-400 border border-amber-800/50' : 'bg-amber-100 text-amber-800 border border-amber-200'
-                              : isDark ? 'bg-rose-950/80 text-rose-400 border border-rose-800/50' : 'bg-rose-100 text-rose-800 border border-rose-200'
-                          }`}>
-                            {sStatus}
-                          </span>
+                          {(() => {
+                            const leaveSched = getStudentLeaveSchedule(student);
+                            return (
+                              <div className="flex flex-col items-start gap-1">
+                                <span className={`px-2.5 py-1 inline-flex text-xs font-semibold rounded-full ${
+                                  sStatus === 'Available' || sStatus === 'Active' 
+                                    ? isDark ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/50' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                    : sStatus === 'On Leave' || sStatus === 'On leave'
+                                    ? isDark ? 'bg-amber-950/80 text-amber-400 border border-amber-800/50' : 'bg-amber-100 text-amber-800 border border-amber-200'
+                                    : isDark ? 'bg-rose-950/80 text-rose-400 border border-rose-800/50' : 'bg-rose-100 text-rose-800 border border-rose-200'
+                                }`}>
+                                  {sStatus}
+                                </span>
+
+                                {leaveSched && leaveSched.type === 'upcoming' && (
+                                  <div className="mt-0.5 max-w-[210px]">
+                                    <div className="flex items-center gap-1 text-[11px] font-semibold text-amber-500 dark:text-amber-400" title={`Leaves on: ${leaveSched.departureText} (Return: ${leaveSched.returnText})`}>
+                                      <Calendar size={12} className="shrink-0 text-amber-500" />
+                                      <span className="truncate">Leaves: {leaveSched.departureText}</span>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
                           <div className="flex items-center justify-center gap-2">
@@ -1316,8 +1493,8 @@ const Students = () => {
                 </div>
               )}
 
-              {/* Status Selector Bar for Admin */}
-              {isAdmin && !isEditing && (
+              {/* Status Selector Bar for Admin & Leader */}
+              {(isAdmin || isLeader) && !isEditing && (
                 <div className={`p-3.5 sm:p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
                   isDark ? 'bg-[#1a1c26] border-gray-800' : 'bg-gray-50 border-gray-200'
                 }`}>
@@ -1344,6 +1521,56 @@ const Students = () => {
                   </div>
                 </div>
               )}
+
+              {/* Leave Schedule Card in Profile Modal */}
+              {(() => {
+                const sched = getStudentLeaveSchedule(selectedStudent);
+                if (!sched) return null;
+                return (
+                  <div className={`p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+                    sched.type === 'active' || sched.type === 'upcoming'
+                      ? isDark ? 'bg-amber-950/40 border-amber-800/60 text-amber-200' : 'bg-amber-50/90 border-amber-200 text-amber-950'
+                      : sched.type === 'pending'
+                      ? isDark ? 'bg-indigo-950/40 border-indigo-800/60 text-indigo-200' : 'bg-indigo-50/90 border-indigo-200 text-indigo-950'
+                      : isDark ? 'bg-gray-900/60 border-gray-800 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-800'
+                  }`}>
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className={`p-2.5 rounded-xl shrink-0 ${
+                        sched.type === 'active' || sched.type === 'upcoming'
+                          ? 'bg-amber-500/20 text-amber-400'
+                          : 'bg-indigo-500/20 text-indigo-400'
+                      }`}>
+                        <Calendar size={20} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wider">{sched.title}</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase border ${
+                            sched.type === 'active' || sched.type === 'upcoming'
+                              ? 'bg-amber-950/80 border-amber-700/60 text-amber-300'
+                              : 'bg-indigo-950/80 border-indigo-700/60 text-indigo-300'
+                          }`}>
+                            {sched.badge}
+                          </span>
+                        </div>
+                        <div className="text-sm font-bold mt-1">
+                          {sched.departureDateAndTime}
+                        </div>
+                        {sched.returnDateAndTime && (
+                          <div className="text-xs font-medium opacity-90 mt-0.5">
+                            {sched.returnDateAndTime}
+                          </div>
+                        )}
+                        {sched.reason && (
+                          <div className="text-xs mt-1.5 opacity-80 italic">
+                            Reason: "{sched.reason}" {sched.destination ? `• Destination: ${sched.destination}` : ''}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* EDIT FORM */}
               {isEditing ? (

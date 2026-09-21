@@ -56,7 +56,7 @@ const createLeaveRequest = async (req, res) => {
       fromTime: fromTime || '',
       toDate,
       toTime: toTime || '',
-      requestedDays: requestedDays ? Number(requestedDays) : undefined,
+      requestedDays: (requestedDays !== undefined && requestedDays !== null && requestedDays !== '') ? Number(requestedDays) : 0,
       previousLeaveDays: previousLeaveDays !== undefined ? Number(previousLeaveDays) : 0,
       destination,
       emergencyContact
