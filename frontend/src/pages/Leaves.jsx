@@ -186,6 +186,8 @@ const Leaves = () => {
                   const sName = getStudentName(leave);
                   const room = getRoom(leave);
                   const statusLower = (leave.status || 'pending').toLowerCase();
+                  const reviewerName = leave.reviewerName || leave.reviewedBy?.name || 'Admin';
+                  const reviewerRole = leave.reviewerRole || leave.reviewedBy?.role || '';
 
                   return (
                     <tr key={leave._id} className={`transition ${isDark ? 'hover:bg-gray-800/30' : 'hover:bg-gray-50'}`}>
@@ -232,16 +234,11 @@ const Leaves = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-xs">
                         <div>{getStatusBadge(leave.status)}</div>
-                        {leave.reviewedBy && (statusLower === 'approved' || statusLower === 'rejected') && (
+                        {(leave.reviewerName || leave.reviewedBy) && (statusLower === 'approved' || statusLower === 'rejected') && (
                           <div className="mt-1.5 flex flex-col gap-0.5">
                             <div className={`font-semibold flex items-center gap-1 ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
                               <span className="text-[11px] font-normal text-gray-500 dark:text-gray-400">By:</span>
-                              <span>{leave.reviewedBy.name || 'Admin'}</span>
-                              {leave.reviewedBy.role && (
-                                <span className="text-[10px] px-1.5 py-0.2 rounded-full font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700/60">
-                                  {leave.reviewedBy.role}
-                                </span>
-                              )}
+                              <span>{reviewerName}</span>
                             </div>
                             {(leave.reviewedAt || leave.updatedAt) && (
                               <div className="text-[10px] text-gray-400 dark:text-gray-500">
@@ -258,8 +255,26 @@ const Leaves = () => {
                             (user?._id && (leave.studentId?.userId?._id === user._id || leave.studentId?.userId === user._id))
                           );
 
+                          // If the leave has already been decided (Approved or Rejected)
+                          if (statusLower === 'approved' || statusLower === 'rejected') {
+                            return (
+                              <div className="flex flex-col items-center justify-center text-xs">
+                                <span className={`font-semibold ${
+                                  statusLower === 'approved'
+                                    ? isDark ? 'text-emerald-400' : 'text-emerald-600'
+                                    : isDark ? 'text-rose-400' : 'text-rose-600'
+                                }`}>
+                                  {statusLower === 'approved'
+                                    ? `Approved by ${reviewerName}`
+                                    : `Rejected by ${reviewerName}`}
+                                </span>
+                              </div>
+                            );
+                          }
+
+                          // If still pending and it's the student's own request
                           if (isOwnLeave) {
-                            return statusLower === 'pending' ? (
+                            return (
                               <Link 
                                 to={`/leaves/edit/${leave._id}`}
                                 className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition shadow-xs"
@@ -267,19 +282,12 @@ const Leaves = () => {
                                 <Edit3 size={13} />
                                 <span>Edit</span>
                               </Link>
-                            ) : (
-                              <span 
-                                className="inline-flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 font-medium bg-gray-100 dark:bg-gray-800/60 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700/50 cursor-not-allowed" 
-                                title={`This leave request has been ${statusLower} and cannot be edited`}
-                              >
-                                <Lock size={12} />
-                                <span>Locked</span>
-                              </span>
                             );
                           }
 
+                          // If still pending and user is Admin or Leader
                           if (isAdminOrLeader) {
-                            return statusLower === 'pending' ? (
+                            return (
                               <div className="flex justify-center space-x-2">
                                 <button 
                                   onClick={() => handleStatusUpdate(leave._id, 'Approved')} 
@@ -294,14 +302,14 @@ const Leaves = () => {
                                   Reject
                                 </button>
                               </div>
-                            ) : (
-                              <span className="text-xs text-gray-400 dark:text-gray-500 font-medium italic">
-                                {leave.reviewedBy?.name ? `Reviewed by ${leave.reviewedBy.name}` : 'Decided'}
-                              </span>
                             );
                           }
 
-                          return null;
+                          return (
+                            <span className="text-xs text-gray-400 dark:text-gray-500 font-medium italic">
+                              Pending Review
+                            </span>
+                          );
                         })()}
                       </td>
                     </tr>

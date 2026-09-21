@@ -47,8 +47,15 @@ const LeaveRequestForm = () => {
               setIsLocked(true);
             }
             setAppliedDate(leave.appliedDate || leave.createdAt || '');
-            if (leave.reviewedBy) {
-              setReviewerInfo(leave.reviewedBy);
+            if (leave.reviewerName || leave.reviewedBy) {
+              setReviewerInfo(
+                typeof leave.reviewedBy === 'object' && leave.reviewedBy?.name
+                  ? leave.reviewedBy
+                  : {
+                      name: leave.reviewerName || 'Admin',
+                      role: leave.reviewerRole || ''
+                    }
+              );
             }
             if (leave.reviewedAt || leave.updatedAt) {
               setReviewedAtDate(leave.reviewedAt || leave.updatedAt);
@@ -215,7 +222,7 @@ const LeaveRequestForm = () => {
             <div className="text-xs mt-1 opacity-90 leading-relaxed">
               This leave request was <strong>{leaveStatus.toLowerCase()}</strong>
               {reviewerInfo?.name ? (
-                <> by <strong>{reviewerInfo.name}</strong>{reviewerInfo.role ? ` (${reviewerInfo.role})` : ''}</>
+                <> by <strong>{reviewerInfo.name}</strong></>
               ) : (
                 ' by administrators'
               )}
