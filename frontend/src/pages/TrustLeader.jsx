@@ -5,6 +5,7 @@ import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { ShieldAlert, UserCheck, Plus, Trash2, Phone, Mail, KeyRound, Eye, GraduationCap, X, Search } from 'lucide-react';
 import AdminResetPasswordModal from '../components/AdminResetPasswordModal';
+import { capitalizeName, formatNameInput } from '../utils/formatters';
 
 const TrustLeader = () => {
   const { user } = useContext(AuthContext);
@@ -77,6 +78,7 @@ const TrustLeader = () => {
       setSubmittingMember(true);
       const payload = {
         ...memberData,
+        name: capitalizeName(memberData.name),
         joiningDate: memberData.joiningDate || new Date().toISOString().split('T')[0]
       };
       await apiClient.post('/trust/members', payload);
@@ -123,7 +125,11 @@ const TrustLeader = () => {
     if (submittingLeader) return;
     try {
       setSubmittingLeader(true);
-      await apiClient.post('/trust/leaders', leaderData);
+      const payload = {
+        ...leaderData,
+        name: capitalizeName(leaderData.name)
+      };
+      await apiClient.post('/trust/leaders', payload);
       setShowForm(false);
       setLeaderData({ name: '', email: '', password: '', role: 'Leader', contactNumber: '', duration: '', studentId: '' });
       setSelectedStudentProfile(null);
@@ -282,7 +288,15 @@ const TrustLeader = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Member Name</label>
-                  <input type="text" required value={memberData.name} onChange={(e) => setMemberData({...memberData, name: e.target.value})} className={`w-full border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'}`} placeholder="Full Name..." />
+                  <input 
+                    type="text" 
+                    required 
+                    value={memberData.name} 
+                    onChange={(e) => setMemberData({...memberData, name: formatNameInput(e.target.value)})} 
+                    onBlur={() => setMemberData(prev => ({ ...prev, name: capitalizeName(prev.name) }))}
+                    className={`w-full border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'}`} 
+                    placeholder="Full Name..." 
+                  />
                 </div>
                 <div>
                   <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Email Address (Login ID) *</label>
@@ -380,7 +394,7 @@ const TrustLeader = () => {
                       <option value="">-- Choose Existing Student Profile --</option>
                       {filteredStudentsForSelect.map((s) => (
                         <option key={s._id} value={s._id}>
-                          {s.fullName || 'Student'} (Room: {s.roomNumber || 'N/A'} • {s.course || 'N/A'})
+                          {capitalizeName(s.fullName || 'Student')} (Room: {s.roomNumber || 'N/A'} • {s.course || 'N/A'})
                         </option>
                       ))}
                     </select>
@@ -398,7 +412,7 @@ const TrustLeader = () => {
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-bold text-gray-900 dark:text-white">{selectedStudentProfile.fullName}</p>
+                          <p className="text-sm font-bold text-gray-900 dark:text-white">{capitalizeName(selectedStudentProfile.fullName)}</p>
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
                             Selected Student
                           </span>
@@ -419,7 +433,15 @@ const TrustLeader = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Leader Name *</label>
-                  <input type="text" required value={leaderData.name} onChange={(e) => setLeaderData({...leaderData, name: e.target.value})} className={`w-full border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'}`} placeholder="Leader name..." />
+                  <input 
+                    type="text" 
+                    required 
+                    value={leaderData.name} 
+                    onChange={(e) => setLeaderData({...leaderData, name: formatNameInput(e.target.value)})} 
+                    onBlur={() => setLeaderData(prev => ({ ...prev, name: capitalizeName(prev.name) }))}
+                    className={`w-full border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? 'bg-[#1a1c26] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'}`} 
+                    placeholder="Leader name..." 
+                  />
                 </div>
                 <div>
                   <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Role / Designation *</label>
@@ -491,7 +513,7 @@ const TrustLeader = () => {
                 members.map((member) => (
                   <tr key={member._id} className={`transition ${isDark ? 'hover:bg-gray-800/30' : 'hover:bg-gray-50'}`}>
                     <td className="p-4">
-                      <div className={`text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{member.name || member.fullName || 'Trustee Member'}</div>
+                      <div className={`text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{capitalizeName(member.name || member.fullName || 'Trustee Member')}</div>
                       {member.email && (
                         <div className="text-xs text-indigo-600 dark:text-indigo-400 flex items-center gap-1 mt-0.5">
                           <Mail size={12} />
@@ -515,7 +537,7 @@ const TrustLeader = () => {
                           <button 
                             onClick={() => setResetModalUser({
                               id: member.userId?._id || member.userId || member.email || member._id,
-                              name: member.name || member.fullName || 'Trust Member',
+                              name: capitalizeName(member.name || member.fullName || 'Trust Member'),
                               email: member.email || member.userId?.email || '',
                               role: member.position || 'Trustee'
                             })} 
@@ -538,7 +560,7 @@ const TrustLeader = () => {
                   return (
                     <tr key={leader._id} className={`transition ${isDark ? 'hover:bg-gray-800/30' : 'hover:bg-gray-50'}`}>
                       <td className="p-4">
-                        <div className={`text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{leader.userId?.name || leader.name || 'Leader'}</div>
+                        <div className={`text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{capitalizeName(leader.userId?.name || leader.name || 'Leader')}</div>
                         <div className="text-xs text-indigo-600 dark:text-indigo-400 flex items-center gap-1 mt-0.5">
                           <Mail size={12} />
                           {leader.userId?.email || leader.email || 'leader@hostel.com'}
@@ -613,7 +635,7 @@ const TrustLeader = () => {
                               <button 
                                 onClick={() => setResetModalUser({
                                   id: leader.userId?._id || leader.userId,
-                                  name: leader.userId?.name || leader.name || 'Leader',
+                                  name: capitalizeName(leader.userId?.name || leader.name || 'Leader'),
                                   email: leader.userId?.email || leader.email || '',
                                   role: leader.role || 'Leader'
                                 })} 
@@ -665,7 +687,7 @@ const TrustLeader = () => {
                     Assign Student Profile
                   </h3>
                   <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                    Link resident to Leader: <span className="font-bold text-indigo-400">{assigningStudentModal.name || assigningStudentModal.email}</span>
+                    Link resident to Leader: <span className="font-bold text-indigo-400">{capitalizeName(assigningStudentModal.name || assigningStudentModal.email)}</span>
                   </p>
                 </div>
               </div>
@@ -715,7 +737,7 @@ const TrustLeader = () => {
                   <option value="">-- Choose Student to Link --</option>
                   {filteredStudentsForAssign.map((s) => (
                     <option key={s._id} value={s._id}>
-                      {s.fullName || 'Student'} (Room {s.roomNumber || 'N/A'} • {s.course || 'N/A'}) - {s.mobile || ''}
+                      {capitalizeName(s.fullName || 'Student')} (Room {s.roomNumber || 'N/A'} • {s.course || 'N/A'}) - {s.mobile || ''}
                     </option>
                   ))}
                 </select>

@@ -3,6 +3,7 @@ import apiClient from '../utils/apiClient';
 import { useNavigate, Link } from 'react-router-dom';
 import { ThemeContext } from '../context/ThemeContext';
 import { ArrowLeft, Save } from 'lucide-react';
+import { capitalizeName, formatNameInput } from '../utils/formatters';
 
 const AddStudent = () => {
   const { theme } = useContext(ThemeContext);
@@ -26,7 +27,11 @@ const AddStudent = () => {
   const [errorMsg, setErrorMsg] = useState('');
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: name === 'name' ? formatNameInput(value) : value
+    });
   };
 
   const [submitting, setSubmitting] = useState(false);
@@ -37,7 +42,11 @@ const AddStudent = () => {
     if (submitting) return;
     try {
       setSubmitting(true);
-      await apiClient.post('/students', formData);
+      const payload = {
+        ...formData,
+        name: capitalizeName(formData.name)
+      };
+      await apiClient.post('/students', payload);
       navigate('/students');
     } catch (error) {
       setErrorMsg(error.message || 'Error creating student');
@@ -75,7 +84,16 @@ const AddStudent = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div>
                 <label className={labelClass}>Full Name</label>
-                <input type="text" name="name" value={formData.name} onChange={handleChange} required className={inputClass} placeholder="Student Name" />
+                <input 
+                  type="text" 
+                  name="name" 
+                  value={formData.name} 
+                  onChange={handleChange} 
+                  onBlur={() => setFormData(prev => ({ ...prev, name: capitalizeName(prev.name) }))}
+                  required 
+                  className={inputClass} 
+                  placeholder="Student Name" 
+                />
               </div>
               <div>
                 <label className={labelClass}>Email Address</label>

@@ -28,7 +28,9 @@ const checkAndNotifyOverdueTasks = async (req) => {
       task.overdueNotified = true;
       await task.save();
 
-      const assigneeName = task.assignedTo?.fullName || task.assignedTo?.name || task.assignedTo?.email || 'Student Resident';
+      const { capitalizeName } = require('../utils/formatters');
+      const rawAssigneeName = task.assignedTo?.fullName || task.assignedTo?.name || task.assignedTo?.email || 'Student Resident';
+      const assigneeName = capitalizeName(rawAssigneeName);
       const notifTitle = '🚨 Overdue Task Alert';
       const notifMsg = `Task "${task.title}" assigned to ${assigneeName} is overdue and not completed yet!`;
 

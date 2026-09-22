@@ -6,6 +6,7 @@ const Notification = require('../models/Notification');
 const { sendWelcomeEmail, getBrevoDefaultPassword } = require('../utils/sendEmail');
 const { sendPushNotification } = require('../utils/webPush');
 const { isLeaveCurrentlyActive } = require('../utils/dateHelper');
+const { capitalizeName } = require('../utils/formatters');
 
 // Helper to auto-sync student status ('On Leave' vs 'Available') for a list of students in 1 SINGLE DB QUERY
 const syncBulkStudentLeaveStatus = async (students) => {
@@ -299,6 +300,7 @@ const createStudent = async (req, res) => {
     }
 
     const cleanEmail = email.trim().toLowerCase();
+    const cleanName = capitalizeName(name);
     const userExists = await User.findOne({ email: cleanEmail });
     if (userExists) {
       return res.status(400).json({ message: 'User with this email already exists' });
@@ -307,7 +309,7 @@ const createStudent = async (req, res) => {
     const finalPassword = (password && password.trim()) ? password.trim() : getBrevoDefaultPassword(cleanEmail);
 
     const user = await User.create({
-      name,
+      name: cleanName,
       email: cleanEmail,
       password: finalPassword,
       role: 'Student'
@@ -315,7 +317,7 @@ const createStudent = async (req, res) => {
 
     const student = new Student({
       userId: user._id,
-      fullName: name,
+      fullName: cleanName,
       village, homeAddress, course, collegeName,
       otherCourseOrJob, joiningYear, joiningMonth,
       mobile, parentsMobile, drivingLicense, drivingLicenseProofUrl, roomNumber
@@ -325,7 +327,7 @@ const createStudent = async (req, res) => {
 
     // Send Welcome email with credentials via Brevo
     await sendWelcomeEmail({
-      name,
+      name: cleanName,
       email: cleanEmail,
       role: 'Student',
       password: finalPassword
@@ -348,6 +350,15 @@ const updateMyStudentProfile = async (req, res) => {
       return res.status(404).json({ message: 'Student profile not found' });
     }
 
+    if (req.body.fullName !== undefined || req.body.name !== undefined) {
+      const updatedName = capitalizeName(req.body.fullName || req.body.name);
+      if (updatedName) {
+        student.fullName = updatedName;
+        if (student.userId) {
+          await User.findByIdAndUpdate(student.userId, { name: updatedName }).catch(() => null);
+        }
+      }
+    }
     if (req.body.village !== undefined) student.village = req.body.village;
     if (req.body.homeAddress !== undefined) student.homeAddress = req.body.homeAddress;
     if (req.body.course !== undefined) student.course = req.body.course;
@@ -403,6 +414,15 @@ const updateStudent = async (req, res) => {
         }
       }
 
+      if (req.body.fullName !== undefined || req.body.name !== undefined) {
+        const updatedName = capitalizeName(req.body.fullName || req.body.name);
+        if (updatedName) {
+          student.fullName = updatedName;
+          if (student.userId) {
+            await User.findByIdAndUpdate(student.userId, { name: updatedName }).catch(() => null);
+          }
+        }
+      }
       if (req.body.village !== undefined) student.village = req.body.village;
       if (req.body.homeAddress !== undefined) student.homeAddress = req.body.homeAddress;
       if (req.body.course !== undefined) student.course = req.body.course;

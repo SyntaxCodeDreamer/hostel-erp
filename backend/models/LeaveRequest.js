@@ -44,6 +44,17 @@ leaveRequestSchema.index({ studentId: 1, status: 1 });
 leaveRequestSchema.index({ createdAt: -1 });
 leaveRequestSchema.index({ appliedDate: -1 });
 
+leaveRequestSchema.pre('save', function(next) {
+  const { capitalizeName } = require('../utils/formatters');
+  if (this.isModified('studentName') && this.studentName) {
+    this.studentName = capitalizeName(this.studentName);
+  }
+  if (this.isModified('reviewerName') && this.reviewerName) {
+    this.reviewerName = capitalizeName(this.reviewerName);
+  }
+  if (typeof next === 'function') next();
+});
+
 const LeaveRequest = mongoose.model('LeaveRequest', leaveRequestSchema);
 
 module.exports = LeaveRequest;

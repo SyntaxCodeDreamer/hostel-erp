@@ -7,6 +7,7 @@ import { Eye, X, Phone, MapPin, GraduationCap, Edit3, Save, CheckCircle, Externa
 import LoadingSpinner from '../components/LoadingSpinner';
 import AdminResetPasswordModal from '../components/AdminResetPasswordModal';
 import * as XLSX from 'xlsx';
+import { capitalizeName, formatNameInput } from '../utils/formatters';
 
 const Students = () => {
   const [students, setStudents] = useState([]);
@@ -315,6 +316,7 @@ const Students = () => {
     setIsEditing(false);
     setSaveSuccess('');
     setEditForm({
+      fullName: capitalizeName(student.fullName || student.name || student.userId?.name || ''),
       mobile: student.mobile || student.mobileNumber || '',
       parentsMobile: student.parentsMobile || student.parentsMobileNumber || '',
       village: student.village || '',
@@ -347,7 +349,11 @@ const Students = () => {
     setSaveSuccess('');
     try {
       const url = isStudent ? '/students/me' : `/students/${selectedStudent._id}`;
-      const { data: updated } = await apiClient.put(url, editForm);
+      const payload = {
+        ...editForm,
+        fullName: capitalizeName(editForm.fullName || '')
+      };
+      const { data: updated } = await apiClient.put(url, payload);
 
       setSelectedStudent({ ...selectedStudent, ...updated });
       setIsEditing(false);
@@ -516,7 +522,9 @@ const Students = () => {
   };
 
   const getStudentName = (student) => {
-    return student.fullName || student.name || student.userId?.name || student.userId?.email || 'Student Resident';
+    if (!student) return 'Student Resident';
+    const raw = student.fullName || student.name || student.userId?.name || student.userId?.email || 'Student Resident';
+    return capitalizeName(raw);
   };
 
   const getStudentEmail = (student) => {
@@ -789,8 +797,9 @@ const Students = () => {
 
         let importedCount = 0;
         for (const row of rawData) {
+          const rawName = row.Name || row['Full Name'] || row.FullName || row['Student Name'] || 'Student';
           const payload = {
-            fullName: row.Name || row['Full Name'] || row.FullName || row['Student Name'] || 'Student',
+            fullName: capitalizeName(String(rawName)),
             email: row.Email || row['Email Address'] || `student_${Date.now()}_${Math.floor(Math.random()*1000)}@hostel.com`,
             mobile: String(row.Mobile || row['Mobile Number'] || row['Phone'] || ''),
             parentsMobile: String(row['Parents Mobile'] || row['Emergency Contact'] || ''),
@@ -889,7 +898,7 @@ const Students = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {leadersList.map((ldr) => {
                   const lStudent = ldr.student || (typeof ldr.studentId === 'object' ? ldr.studentId : null);
-                  const lName = ldr.name || ldr.userId?.name || lStudent?.fullName || 'Leader';
+                  const lName = capitalizeName(ldr.name || ldr.userId?.name || lStudent?.fullName || 'Leader');
                   const isSelected = selectedStudent && lStudent && selectedStudent._id === lStudent._id;
                   return (
                     <div
@@ -1939,6 +1948,19 @@ const Students = () => {
                   <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl border ${
                     isDark ? 'bg-[#1a1c26] border-gray-800' : 'bg-gray-50 border-gray-200'
                   }`}>
+                    <div className="sm:col-span-2">
+                      <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Full Name</label>
+                      <input
+                        type="text"
+                        value={editForm.fullName || ''}
+                        onChange={(e) => setEditForm({ ...editForm, fullName: formatNameInput(e.target.value) })}
+                        onBlur={(e) => setEditForm({ ...editForm, fullName: capitalizeName(e.target.value) })}
+                        className={`w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 ${
+                          isDark ? 'bg-[#14161f] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                        }`}
+                        placeholder="Student full name..."
+                      />
+                    </div>
                     <div>
                       <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Student Mobile</label>
                       <input

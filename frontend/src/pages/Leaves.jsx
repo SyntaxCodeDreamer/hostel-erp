@@ -5,6 +5,7 @@ import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { Calendar, Plus, MapPin, Search, Clock, Lock, Edit3 } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { capitalizeName } from '../utils/formatters';
 
 const Leaves = () => {
   const [leaves, setLeaves] = useState([]);
@@ -79,7 +80,8 @@ const Leaves = () => {
   const getStudentName = (leave) => {
     const s = leave.studentId;
     if (!s) return 'Student Resident';
-    return s.fullName || s.name || s.userId?.name || s.userId?.email || 'Student Resident';
+    const raw = s.fullName || s.name || s.userId?.name || s.userId?.email || 'Student Resident';
+    return capitalizeName(raw);
   };
 
   const getRoom = (leave) => {
@@ -186,7 +188,7 @@ const Leaves = () => {
                   const sName = getStudentName(leave);
                   const room = getRoom(leave);
                   const statusLower = (leave.status || 'pending').toLowerCase();
-                  const reviewerName = leave.reviewerName || leave.reviewedBy?.name || 'Admin';
+                  const reviewerName = capitalizeName(leave.reviewerName || leave.reviewedBy?.name || 'Admin');
                   const reviewerRole = leave.reviewerRole || leave.reviewedBy?.role || '';
 
                   return (

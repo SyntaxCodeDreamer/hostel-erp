@@ -4,6 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { Plus, Clock, User as UserIcon, AlertTriangle } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { capitalizeName } from '../utils/formatters';
 
 const Tasks = () => {
   const { user } = useContext(AuthContext);
@@ -156,7 +157,8 @@ const Tasks = () => {
   const getAssigneeName = (task) => {
     const u = task.assignedTo;
     if (!u) return 'Unassigned';
-    return u.fullName || u.name || u.email || 'Student Resident';
+    const raw = u.fullName || u.name || u.email || 'Student Resident';
+    return capitalizeName(raw);
   };
 
   const getPriorityBadge = (priority) => {

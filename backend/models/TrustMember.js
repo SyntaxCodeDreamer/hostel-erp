@@ -29,5 +29,13 @@ const trustMemberSchema = new mongoose.Schema({
   timestamps: true
 });
 
+trustMemberSchema.pre('save', function(next) {
+  if (this.isModified('name') && this.name) {
+    const { capitalizeName } = require('../utils/formatters');
+    this.name = capitalizeName(this.name);
+  }
+  if (typeof next === 'function') next();
+});
+
 const TrustMember = mongoose.model('TrustMember', trustMemberSchema);
 module.exports = TrustMember;

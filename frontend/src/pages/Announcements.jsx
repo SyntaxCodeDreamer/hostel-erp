@@ -4,6 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { Pin, Plus, Trash2, Calendar, User as UserIcon } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { capitalizeName } from '../utils/formatters';
 
 const Announcements = () => {
   const { user } = useContext(AuthContext);
@@ -259,7 +260,7 @@ const Announcements = () => {
             <div className={`mt-6 pt-4 border-t flex items-center justify-between text-xs ${isDark ? 'border-gray-800/60 text-gray-400' : 'border-gray-100 text-gray-600'}`}>
               <span className="flex items-center gap-1.5">
                 <UserIcon size={14} className="text-indigo-600 dark:text-indigo-400" />
-                Authored by: <strong className={isDark ? 'text-gray-200' : 'text-gray-900'}>{ann.createdBy?.name || ann.createdBy?.email || 'Admin'}</strong>
+                Authored by: <strong className={isDark ? 'text-gray-200' : 'text-gray-900'}>{capitalizeName(ann.createdBy?.name) || ann.createdBy?.email || 'Admin'}</strong>
               </span>
               <span className="flex items-center gap-1">
                 <Calendar size={14} className={isDark ? 'text-gray-500' : 'text-gray-400'} />

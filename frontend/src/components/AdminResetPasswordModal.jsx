@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { KeyRound, X, Check, Copy, Eye, EyeOff, ShieldAlert, Sparkles } from 'lucide-react';
 import apiClient from '../utils/apiClient';
+import { capitalizeName } from '../utils/formatters';
 
 const AdminResetPasswordModal = ({ isOpen, onClose, targetUser, onSuccess }) => {
   const [resetType, setResetType] = useState('default'); // 'default' or 'custom'
@@ -98,7 +99,7 @@ const AdminResetPasswordModal = ({ isOpen, onClose, targetUser, onSuccess }) => 
           {/* User Target Card */}
           <div className="my-4 p-3.5 rounded-xl bg-[#1a1c26] border border-gray-800/80 flex items-center justify-between">
             <div className="min-w-0">
-              <div className="font-semibold text-sm text-white truncate">{targetUser.name || 'User'}</div>
+              <div className="font-semibold text-sm text-white truncate">{capitalizeName(targetUser.name || 'User')}</div>
               <div className="text-xs text-gray-400 truncate">{targetUser.email}</div>
             </div>
             <span className="bg-indigo-950 text-indigo-300 border border-indigo-800/40 text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0">

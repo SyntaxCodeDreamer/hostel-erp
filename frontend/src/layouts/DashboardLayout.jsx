@@ -7,6 +7,7 @@ import { usePush } from '../context/PushContext';
 import { Bell, Sun, Moon, Menu, X, BellRing, Smartphone, Send, Check, AlertCircle, RefreshCw, User } from 'lucide-react';
 import apiClient from '../utils/apiClient';
 import { motion, AnimatePresence } from 'framer-motion';
+import { capitalizeName } from '../utils/formatters';
 
 const DashboardLayout = () => {
   const { user, logout } = useContext(AuthContext);
@@ -401,7 +402,7 @@ const DashboardLayout = () => {
                     className={`absolute top-12 right-0 w-48 rounded-xl shadow-2xl border py-2 z-50 ${isDark ? 'bg-[#181a26] border-gray-800 text-gray-200' : 'bg-white border-gray-100 text-gray-800'}`}
                   >
                     <div className="px-4 py-3 border-b border-gray-700/50">
-                      <p className="text-sm font-bold truncate">{user?.name}</p>
+                      <p className="text-sm font-bold truncate">{capitalizeName(user?.name)}</p>
                       <p className="text-xs text-indigo-500 font-semibold truncate">{user?.role}</p>
                     </div>
                     {['student', 'leader'].includes((user?.role || '').toLowerCase()) && (

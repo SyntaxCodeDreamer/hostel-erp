@@ -80,6 +80,14 @@ studentSchema.index({ userId: 1 });
 studentSchema.index({ status: 1 });
 studentSchema.index({ mobile: 1 });
 
+studentSchema.pre('save', function(next) {
+  if (this.isModified('fullName') && this.fullName) {
+    const { capitalizeName } = require('../utils/formatters');
+    this.fullName = capitalizeName(this.fullName);
+  }
+  if (typeof next === 'function') next();
+});
+
 const Student = mongoose.model('Student', studentSchema);
 
 module.exports = Student;

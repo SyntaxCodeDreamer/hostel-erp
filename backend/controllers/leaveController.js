@@ -4,6 +4,7 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { sendPushNotification } = require('../utils/webPush');
 const { isLeaveCurrentlyActive } = require('../utils/dateHelper');
+const { capitalizeName } = require('../utils/formatters');
 
 // @desc    Get all leave requests (filtered by ownership for Students)
 // @route   GET /api/leaves
@@ -78,7 +79,7 @@ const createLeaveRequest = async (req, res) => {
 
     const leaveRequest = new LeaveRequest({
       studentId: student._id,
-      studentName: student.fullName || req.user.name || '',
+      studentName: capitalizeName(student.fullName || req.user.name || ''),
       roomNumber: student.roomNumber || '',
       appliedDate: new Date(),
       reason,
@@ -146,7 +147,7 @@ const updateLeaveStatus = async (req, res) => {
 
     leaveRequest.status = status;
     leaveRequest.reviewedBy = req.user._id;
-    leaveRequest.reviewerName = req.user.name || '';
+    leaveRequest.reviewerName = capitalizeName(req.user.name || '');
     leaveRequest.reviewerRole = req.user.role || '';
     leaveRequest.reviewedAt = new Date();
     if (remarks !== undefined) leaveRequest.remarks = remarks;

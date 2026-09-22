@@ -4,6 +4,7 @@ const TrustMember = require('../models/TrustMember');
 const Student = require('../models/Student');
 const generateToken = require('../utils/generateToken');
 const { sendWelcomeEmail, getBrevoDefaultPassword } = require('../utils/sendEmail');
+const { capitalizeName } = require('../utils/formatters');
 
 // Helper to find or auto-heal/recreate User record from directory profiles
 const findOrSyncUserByEmail = async (cleanEmail) => {
@@ -15,7 +16,7 @@ const findOrSyncUserByEmail = async (cleanEmail) => {
   if (leader) {
     const defaultPass = getBrevoDefaultPassword(leader.email);
     user = await User.create({
-      name: leader.name || 'Leader',
+      name: capitalizeName(leader.name) || 'Leader',
       email: leader.email.toLowerCase().trim(),
       password: defaultPass,
       role: 'Leader'
@@ -30,7 +31,7 @@ const findOrSyncUserByEmail = async (cleanEmail) => {
   if (trustee) {
     const defaultPass = getBrevoDefaultPassword(trustee.email);
     user = await User.create({
-      name: trustee.name || 'Trust Member',
+      name: capitalizeName(trustee.name) || 'Trust Member',
       email: trustee.email.toLowerCase().trim(),
       password: defaultPass,
       role: trustee.role || 'Trustee'
@@ -45,7 +46,7 @@ const findOrSyncUserByEmail = async (cleanEmail) => {
   if (student) {
     const defaultPass = getBrevoDefaultPassword(student.email);
     user = await User.create({
-      name: student.fullName || 'Student',
+      name: capitalizeName(student.fullName) || 'Student',
       email: student.email.toLowerCase().trim(),
       password: defaultPass,
       role: 'Student'
@@ -111,7 +112,7 @@ const login = async (req, res) => {
 
       res.json({
         _id: user._id,
-        name: user.name,
+        name: capitalizeName(user.name),
         email: user.email,
         role: user.role,
         profileImage: user.profileImage,
@@ -135,6 +136,7 @@ const register = async (req, res) => {
 
   try {
     const cleanEmail = email.trim().toLowerCase();
+    const cleanName = capitalizeName(name);
     const userExists = await User.findOne({ email: cleanEmail });
 
     if (userExists) {
@@ -145,7 +147,7 @@ const register = async (req, res) => {
     const finalPassword = (password && password.trim()) ? password.trim() : getBrevoDefaultPassword(cleanEmail);
 
     const user = await User.create({
-      name,
+      name: cleanName,
       email: cleanEmail,
       password: finalPassword,
       role: userRole
@@ -154,7 +156,7 @@ const register = async (req, res) => {
     if (user) {
       // Send Welcome email via Brevo
       sendWelcomeEmail({
-        name,
+        name: cleanName,
         email: cleanEmail,
         role: userRole,
         password: finalPassword
@@ -162,7 +164,7 @@ const register = async (req, res) => {
 
       res.status(201).json({
         _id: user._id,
-        name: user.name,
+        name: capitalizeName(user.name),
         email: user.email,
         role: user.role,
         token: generateToken(user._id, user.role),
@@ -185,7 +187,7 @@ const getProfile = async (req, res) => {
     if (user) {
       res.json({
         _id: user._id,
-        name: user.name,
+        name: capitalizeName(user.name),
         email: user.email,
         role: user.role,
         profileImage: user.profileImage,

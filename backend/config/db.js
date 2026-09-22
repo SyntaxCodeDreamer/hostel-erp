@@ -23,6 +23,10 @@ const connectDB = async () => {
     });
     isConnected = true;
     console.log(`MongoDB Connected (Pool Size: 50): ${conn.connection.host}`);
+
+    // Auto-sanitize existing database names to ensure first and last names have first letters capitalized
+    const { sanitizeAllDatabaseNames } = require('../utils/formatters');
+    sanitizeAllDatabaseNames().catch(err => console.error('Sanitization non-fatal error:', err));
   } catch (error) {
     console.error(`MongoDB Connection Error: ${error.message}`);
   }

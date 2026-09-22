@@ -12,6 +12,7 @@ import {
 import { motion } from 'framer-motion';
 
 import LoadingSpinner from '../components/LoadingSpinner';
+import { capitalizeName } from '../utils/formatters';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -566,7 +567,7 @@ const Dashboard = () => {
                 <div>
                   <h4 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{item.title}</h4>
                   <p className={`text-xs mt-1 line-clamp-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{item.description || item.content}</p>
-                  <p className="text-[11px] text-gray-500 mt-2">Posted by <span className="text-indigo-600 font-semibold">{item.createdBy?.name || item.createdBy?.email || 'Admin'}</span></p>
+                  <p className="text-[11px] text-gray-500 mt-2">Posted by <span className="text-indigo-600 font-semibold">{capitalizeName(item.createdBy?.name) || item.createdBy?.email || 'Admin'}</span></p>
                 </div>
                 <span className="text-xs text-gray-400 whitespace-nowrap ml-4">
                   {new Date(item.createdAt || Date.now()).toLocaleDateString()}
@@ -631,7 +632,7 @@ const Dashboard = () => {
                         </span>
                         {item.studentName && (
                           <span className="text-xs font-semibold text-gray-300">
-                            {item.studentName} {item.roomNumber ? `• Room ${item.roomNumber}` : ''}
+                            {capitalizeName(item.studentName)} {item.roomNumber ? `• Room ${item.roomNumber}` : ''}
                           </span>
                         )}
                       </div>

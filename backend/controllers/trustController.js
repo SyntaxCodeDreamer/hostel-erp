@@ -3,6 +3,7 @@ const LeaderProfile = require('../models/LeaderProfile');
 const Student = require('../models/Student');
 const User = require('../models/User');
 const { sendWelcomeEmail, getBrevoDefaultPassword } = require('../utils/sendEmail');
+const { capitalizeName } = require('../utils/formatters');
 
 // --- Trust Members ---
 
@@ -35,7 +36,8 @@ const getTrustMembers = async (req, res) => {
       }
       return {
         ...m,
-        userId: u || null
+        name: capitalizeName(m.name || u?.name || ''),
+        userId: u ? { ...u, name: capitalizeName(u.name) } : null
       };
     }));
 
@@ -57,6 +59,7 @@ const createTrustMember = async (req, res) => {
       return res.status(400).json({ message: 'Name is required to add a trust member' });
     }
 
+    const cleanName = capitalizeName(name);
     const cleanEmail = (email || '').trim().toLowerCase();
     const assignedRole = 'Trustee';
     const finalPassword = (password && password.trim()) ? password.trim() : (cleanEmail ? getBrevoDefaultPassword(cleanEmail) : 'trustee1993');
@@ -67,7 +70,7 @@ const createTrustMember = async (req, res) => {
       let user = await User.findOne({ email: cleanEmail });
       if (!user) {
         user = await User.create({
-          name,
+          name: cleanName,
           email: cleanEmail,
           password: finalPassword,
           role: assignedRole
@@ -83,7 +86,7 @@ const createTrustMember = async (req, res) => {
 
       // Send Welcome login email with password instructions
       await sendWelcomeEmail({
-        name,
+        name: cleanName,
         email: cleanEmail,
         role: assignedRole,
         password: finalPassword
@@ -91,7 +94,7 @@ const createTrustMember = async (req, res) => {
     }
 
     const member = await TrustMember.create({
-      name,
+      name: cleanName,
       email: cleanEmail,
       userId: createdUser ? createdUser._id : null,
       position,
@@ -151,7 +154,7 @@ const getLeaders = async (req, res) => {
       }
       return {
         ...l,
-        name: l.name || l.userId?.name || student?.fullName || '',
+        name: capitalizeName(l.name || l.userId?.name || student?.fullName || ''),
         email: l.email || l.userId?.email || student?.email || '',
         contactNumber: l.contactNumber || student?.mobile || '',
         student: student || null
@@ -191,6 +194,7 @@ const createLeader = async (req, res) => {
       return res.status(400).json({ message: 'Email is required to create a Leader account' });
     }
 
+    leaderName = capitalizeName(leaderName);
     const finalPassword = (password && password.trim()) ? password.trim() : getBrevoDefaultPassword(cleanEmail);
 
     // Find or create user
@@ -300,7 +304,7 @@ const updateLeader = async (req, res) => {
       return res.status(404).json({ message: 'Leader not found' });
     }
 
-    if (name) leader.name = name;
+    if (name) leader.name = capitalizeName(name);
     if (email) leader.email = email.trim().toLowerCase();
     if (role) leader.role = role;
     if (contactNumber !== undefined) leader.contactNumber = contactNumber;
