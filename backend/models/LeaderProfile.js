@@ -6,6 +6,10 @@ const leaderProfileSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  studentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Student'
+  },
   name: {
     type: String,
     default: ''

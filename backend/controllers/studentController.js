@@ -1,5 +1,6 @@
 const Student = require('../models/Student');
 const User = require('../models/User');
+const LeaderProfile = require('../models/LeaderProfile');
 const LeaveRequest = require('../models/LeaveRequest');
 const Notification = require('../models/Notification');
 const { sendWelcomeEmail, getBrevoDefaultPassword } = require('../utils/sendEmail');
@@ -37,6 +38,62 @@ const syncBulkStudentLeaveStatus = async (students) => {
     const bulkOps = [];
     for (const student of students) {
       const currentStatus = (student.status || '').toLowerCase();
+      if (student.suspendedFrom || student.suspendedUntil || currentStatus === 'suspended') {
+        const fromDate = student.suspendedFrom ? new Date(student.suspendedFrom) : null;
+        const untilDate = student.suspendedUntil ? new Date(student.suspendedUntil) : null;
+
+        if (untilDate && now > untilDate) {
+          student.status = 'Available';
+          student.isManualStatus = false;
+          student.suspendedFrom = null;
+          student.suspendedUntil = null;
+          student.suspensionReason = '';
+          student.suspendedAt = null;
+          bulkOps.push({
+            updateOne: {
+              filter: { _id: student._id },
+              update: {
+                $set: {
+                  status: 'Available',
+                  isManualStatus: false,
+                  suspendedFrom: null,
+                  suspendedUntil: null,
+                  suspensionReason: '',
+                  suspendedAt: null
+                }
+              }
+            }
+          });
+        } else if (fromDate && now < fromDate) {
+          // Future suspension: not started yet
+          if (student.status === 'Suspended') {
+            student.status = 'Available';
+            bulkOps.push({
+              updateOne: {
+                filter: { _id: student._id },
+                update: { $set: { status: 'Available' } }
+              }
+            });
+          }
+        } else if ((!fromDate || now >= fromDate) && (!untilDate || now <= untilDate)) {
+          if (student.status !== 'Suspended') {
+            student.status = 'Suspended';
+            student.isManualStatus = true;
+            bulkOps.push({
+              updateOne: {
+                filter: { _id: student._id },
+                update: { $set: { status: 'Suspended', isManualStatus: true } }
+              }
+            });
+          }
+          continue;
+        }
+
+        if (currentStatus === 'suspended') {
+          continue;
+        }
+      }
+
       if (currentStatus === 'in-active' || currentStatus === 'inactive' || currentStatus === 'left') {
         continue;
       }
@@ -95,7 +152,7 @@ const getStudents = async (req, res) => {
 
     if (userRole === 'student') {
       // Students only see their own profile
-      let student = await Student.findOne({ userId: req.user._id }).populate('userId', 'name email profileImage').lean();
+      let student = await Student.findOne({ userId: req.user._id }).populate('userId', 'name email role profileImage').lean();
       if (!student) {
         const newStudent = new Student({
           userId: req.user._id,
@@ -114,6 +171,9 @@ const getStudents = async (req, res) => {
         });
         await newStudent.save();
         student = await Student.findById(newStudent._id).populate('userId', 'name email profileImage').lean();
+      }
+      if (student) {
+        await syncBulkStudentLeaveStatus([student]);
       }
       return res.json([student]);
     }
@@ -138,7 +198,7 @@ const getStudents = async (req, res) => {
 
       const total = await Student.countDocuments(query);
       const students = await Student.find(query)
-        .populate('userId', 'name email profileImage')
+        .populate('userId', 'name email role profileImage')
         .skip(skip)
         .limit(limit)
         .lean();
@@ -152,7 +212,7 @@ const getStudents = async (req, res) => {
       });
     }
 
-    const students = await Student.find(query).populate('userId', 'name email profileImage').lean();
+    const students = await Student.find(query).populate('userId', 'name email role profileImage').lean();
     await syncBulkStudentLeaveStatus(students);
     res.json(students);
   } catch (error) {
@@ -165,7 +225,7 @@ const getStudents = async (req, res) => {
 // @access  Private (Student)
 const getMyStudentProfile = async (req, res) => {
   try {
-    let student = await Student.findOne({ userId: req.user._id }).populate('userId', 'name email profileImage').lean();
+    let student = await Student.findOne({ userId: req.user._id }).populate('userId', 'name email role profileImage').lean();
     if (!student) {
       const userRole = (req.user.role || '').toLowerCase();
       if (userRole === 'student' || userRole === 'leader') {
@@ -185,7 +245,7 @@ const getMyStudentProfile = async (req, res) => {
           status: 'Available'
         });
         await newStudent.save();
-        student = await Student.findById(newStudent._id).populate('userId', 'name email profileImage').lean();
+        student = await Student.findById(newStudent._id).populate('userId', 'name email role profileImage').lean();
       } else {
         return res.status(404).json({ message: 'Student profile not found' });
       }
@@ -202,14 +262,18 @@ const getMyStudentProfile = async (req, res) => {
 // @access  Private
 const getStudentById = async (req, res) => {
   try {
-    let student = await Student.findById(req.params.id).populate('userId', 'name email profileImage').lean();
+    let student = await Student.findById(req.params.id).populate('userId', 'name email role profileImage').lean();
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
     }
 
     const userRole = (req.user.role || '').toLowerCase();
-    if (userRole === 'student' && student.userId?._id.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Not authorized to view other student profiles' });
+    if (userRole === 'student' && student.userId?._id?.toString() !== req.user._id?.toString()) {
+      const targetRole = (student.userId?.role || '').toLowerCase();
+      const isLeader = targetRole === 'leader' || (await LeaderProfile.exists({ studentId: student._id }));
+      if (!isLeader) {
+        return res.status(403).json({ message: 'Not authorized to view other student profiles' });
+      }
     }
     await syncBulkStudentLeaveStatus([student]);
     res.json(student);
@@ -318,8 +382,25 @@ const updateStudent = async (req, res) => {
     if (student) {
       const userRole = (req.user.role || '').toLowerCase();
       // Allow students to update their own profile
-      if (userRole === 'student' && student.userId?.toString() !== req.user._id.toString()) {
-        return res.status(403).json({ message: 'Not authorized to update this profile' });
+      if (userRole === 'student') {
+        if (student.userId?.toString() !== req.user._id.toString()) {
+          return res.status(403).json({ message: 'Not authorized to update this profile' });
+        }
+      }
+
+      // Suspended students cannot have their status or suspension dates modified except by admin
+      const isCurrentlySuspended = (student.status || '').toLowerCase() === 'suspended' || !!student.suspendedUntil;
+      if (isCurrentlySuspended && userRole !== 'admin') {
+        if (
+          (req.body.status && req.body.status !== student.status) ||
+          req.body.suspendedFrom !== undefined ||
+          req.body.suspendedUntil !== undefined ||
+          req.body.suspensionReason !== undefined
+        ) {
+          return res.status(403).json({
+            message: 'This student is suspended and cannot be modified.'
+          });
+        }
       }
 
       if (req.body.village !== undefined) student.village = req.body.village;
@@ -341,7 +422,53 @@ const updateStudent = async (req, res) => {
       if (req.body.progressItems !== undefined) student.progressItems = req.body.progressItems;
       if (req.body.status && userRole !== 'student') {
         student.status = req.body.status;
-        student.isManualStatus = req.body.status === 'On Leave';
+        student.isManualStatus = req.body.status === 'On Leave' || req.body.status === 'Suspended';
+        if (req.body.status === 'Suspended') {
+          if (req.body.suspendedFrom) {
+            const from = new Date(req.body.suspendedFrom);
+            from.setHours(0, 0, 0, 0);
+            student.suspendedFrom = from;
+          } else if (!student.suspendedFrom) {
+            const from = new Date();
+            from.setHours(0, 0, 0, 0);
+            student.suspendedFrom = from;
+          }
+          if (req.body.suspendedUntil) {
+            const until = new Date(req.body.suspendedUntil);
+            until.setHours(23, 59, 59, 999);
+            student.suspendedUntil = until;
+          }
+          if (req.body.suspensionReason !== undefined) {
+            student.suspensionReason = req.body.suspensionReason;
+          }
+          student.suspendedAt = new Date();
+        } else {
+          student.suspendedFrom = null;
+          student.suspendedUntil = null;
+          student.suspensionReason = '';
+          student.suspendedAt = null;
+        }
+      }
+      if (req.body.suspendedFrom !== undefined && userRole !== 'student') {
+        if (req.body.suspendedFrom) {
+          const from = new Date(req.body.suspendedFrom);
+          from.setHours(0, 0, 0, 0);
+          student.suspendedFrom = from;
+        } else {
+          student.suspendedFrom = null;
+        }
+      }
+      if (req.body.suspendedUntil !== undefined && userRole !== 'student') {
+        if (req.body.suspendedUntil) {
+          const until = new Date(req.body.suspendedUntil);
+          until.setHours(23, 59, 59, 999);
+          student.suspendedUntil = until;
+        } else {
+          student.suspendedUntil = null;
+        }
+      }
+      if (req.body.suspensionReason !== undefined && userRole !== 'student') {
+        student.suspensionReason = req.body.suspensionReason;
       }
       if (req.body.isManualStatus !== undefined && userRole !== 'student') {
         student.isManualStatus = !!req.body.isManualStatus;

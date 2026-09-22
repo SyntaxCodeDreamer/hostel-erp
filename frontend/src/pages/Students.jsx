@@ -1,9 +1,9 @@
-import React, { useEffect, useState, useContext, useMemo } from 'react';
+import React, { useEffect, useState, useContext, useMemo, useRef } from 'react';
 import apiClient from '../utils/apiClient';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
-import { Eye, X, Phone, MapPin, GraduationCap, Edit3, Save, CheckCircle, ExternalLink, Link as LinkIcon, TrendingUp, Plus, Trash2, Award, FileText, Search, ShieldCheck, CheckCircle2, FileSpreadsheet, Upload, User, KeyRound, Calendar, Clock } from 'lucide-react';
+import { Eye, X, Phone, MapPin, GraduationCap, Edit3, Save, CheckCircle, ExternalLink, Link as LinkIcon, TrendingUp, Plus, Trash2, Award, FileText, Search, ShieldCheck, CheckCircle2, FileSpreadsheet, Upload, User, KeyRound, Calendar, Clock, AlertTriangle, UserCheck } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import AdminResetPasswordModal from '../components/AdminResetPasswordModal';
 import * as XLSX from 'xlsx';
@@ -18,10 +18,13 @@ const Students = () => {
   const [studentLeaveCount, setStudentLeaveCount] = useState(0);
   const [leavesList, setLeavesList] = useState([]);
   const [resetModalUser, setResetModalUser] = useState(null);
+  const [leadersList, setLeadersList] = useState([]);
   const { user } = useContext(AuthContext);
   const { theme } = useContext(ThemeContext);
   const isDark = theme === 'dark';
   const location = useLocation();
+  const navigate = useNavigate();
+  const fetchedStudentIdRef = useRef(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -38,12 +41,24 @@ const Students = () => {
     other: ''
   });
   const [progressSaving, setProgressSaving] = useState(false);
+  const [suspendModal, setSuspendModal] = useState({
+    isOpen: false,
+    student: null,
+    suspendedFrom: '',
+    suspendedUntil: '',
+    suspensionReason: '',
+    loading: false,
+    error: ''
+  });
 
   const isStudent = (user?.role || '').toLowerCase() === 'student';
   const isAdmin = (user?.role || '').toLowerCase() === 'admin';
   const isLeader = (user?.role || '').toLowerCase() === 'leader';
   const isTrustMember = ['trust member', 'trustee'].includes((user?.role || '').toLowerCase());
   const canManageProgress = !isTrustMember;
+
+  const isOwnProfile = !selectedStudent || !user || 
+    (selectedStudent.userId?._id ? selectedStudent.userId._id.toString() === (user._id || user.id).toString() : (selectedStudent.userId?.toString() === (user._id || user.id).toString()));
 
   const handleAddProgress = async (e) => {
     e.preventDefault();
@@ -185,11 +200,76 @@ const Students = () => {
     }
   };
 
+  const handleAppointAsLeader = async (student) => {
+    if (!student) return;
+    const sName = getStudentName(student);
+    const confirmAppoint = window.confirm(`Appoint ${sName} as a Hostel Leader?`);
+    if (!confirmAppoint) return;
+    try {
+      await apiClient.post('/trust/leaders', {
+        studentId: student._id,
+        name: sName,
+        email: getStudentEmail(student),
+        contactNumber: student.mobile || '',
+        role: 'Leader'
+      });
+      alert(`${sName} has been appointed as Hostel Leader!`);
+      if (student.userId && typeof student.userId === 'object') {
+        student.userId.role = 'Leader';
+      }
+      setSelectedStudent(prev => ({
+        ...prev,
+        userId: typeof prev.userId === 'object' ? { ...prev.userId, role: 'Leader' } : { role: 'Leader' }
+      }));
+      fetchStudents();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to appoint student as leader');
+    }
+  };
+
+  const handleCloseProfile = () => {
+    fetchedStudentIdRef.current = null;
+    setSelectedStudent(null);
+    setIsEditing(false);
+    if (location.search.includes('studentId') || location.search.includes('view=')) {
+      navigate('/students', { replace: true });
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && selectedStudent) {
+        handleCloseProfile();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedStudent, location.search]);
+
   useEffect(() => {
     fetchStudents(currentPage, searchQuery);
     if (isLeader && location.search.includes('view=me')) {
       handleOpenMyProfile();
     }
+    const params = new URLSearchParams(location.search);
+    const sId = params.get('studentId');
+    if (sId && sId !== fetchedStudentIdRef.current) {
+      fetchedStudentIdRef.current = sId;
+      apiClient.get(`/students/${sId}`).then(res => {
+        if (res.data) handleViewProfile(res.data);
+      }).catch(console.error);
+    } else if (!sId) {
+      fetchedStudentIdRef.current = null;
+    }
+    const qSearch = params.get('search');
+    if (qSearch && qSearch !== searchQuery) {
+      setSearchQuery(qSearch);
+    }
+
+    // Fetch leaders list for quick viewing of leader profiles
+    apiClient.get('/trust/leaders').then(res => {
+      setLeadersList(Array.isArray(res.data) ? res.data : []);
+    }).catch(() => {});
   }, [currentPage, searchQuery, location.search]);
 
   const fetchStudents = async (page = currentPage, search = searchQuery) => {
@@ -217,8 +297,10 @@ const Students = () => {
         setLeavesList(leavesData);
       }
 
-      // If user is a Student, automatically select their profile
-      if (isStudent && studentArr.length > 0) {
+      // If user is a Student, automatically select their profile only if not viewing a specific student profile
+      const params = new URLSearchParams(window.location.search);
+      const urlSId = params.get('studentId');
+      if (isStudent && studentArr.length > 0 && !urlSId) {
         handleViewProfile(studentArr[0]);
       }
     } catch (error) {
@@ -304,18 +386,132 @@ const Students = () => {
     }
   };
 
+  const formatSuspensionRange = (from, until) => {
+    if (!until && !from) return 'Indefinitely';
+    const fmt = (d) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    if (from && until) {
+      return `From ${fmt(from)} till ${fmt(until)}`;
+    }
+    if (until) {
+      return `Until ${fmt(until)}`;
+    }
+    return `From ${fmt(from)}`;
+  };
+
+  const openSuspendModal = (student) => {
+    if (!student) return;
+    const isCurrentlySuspended = (student.status || '').toLowerCase() === 'suspended' || !!student.suspendedUntil;
+    if (isCurrentlySuspended && !isAdmin) {
+      alert('This student is suspended and cannot be modified.');
+      return;
+    }
+    const today = new Date().toISOString().split('T')[0];
+    let defaultFrom = today;
+    let defaultUntil = '';
+
+    if (student.suspendedFrom) {
+      try {
+        defaultFrom = new Date(student.suspendedFrom).toISOString().split('T')[0];
+      } catch (e) {
+        defaultFrom = today;
+      }
+    }
+
+    if (student.suspendedUntil) {
+      try {
+        defaultUntil = new Date(student.suspendedUntil).toISOString().split('T')[0];
+      } catch (e) {
+        defaultUntil = '';
+      }
+    } else {
+      const defaultUntilDate = new Date();
+      defaultUntilDate.setDate(defaultUntilDate.getDate() + 3);
+      defaultUntil = defaultUntilDate.toISOString().split('T')[0];
+    }
+
+    setSuspendModal({
+      isOpen: true,
+      student,
+      suspendedFrom: defaultFrom,
+      suspendedUntil: defaultUntil,
+      suspensionReason: student.suspensionReason || '',
+      loading: false,
+      error: ''
+    });
+  };
+
+  const handleConfirmSuspend = async (e) => {
+    e?.preventDefault();
+    if (!suspendModal.student) return;
+    const isCurrentlySuspended = (suspendModal.student.status || '').toLowerCase() === 'suspended' || !!suspendModal.student.suspendedUntil;
+    if (isCurrentlySuspended && !isAdmin) {
+      alert('This student is suspended and cannot be modified.');
+      return;
+    }
+    if (!suspendModal.suspendedFrom) {
+      setSuspendModal(prev => ({ ...prev, error: 'Please choose the start date (From Date).' }));
+      return;
+    }
+    if (!suspendModal.suspendedUntil) {
+      setSuspendModal(prev => ({ ...prev, error: 'Please choose the end date (Till Date).' }));
+      return;
+    }
+    if (new Date(suspendModal.suspendedUntil) < new Date(suspendModal.suspendedFrom)) {
+      setSuspendModal(prev => ({ ...prev, error: 'Till Date cannot be earlier than From Date.' }));
+      return;
+    }
+
+    setSuspendModal(prev => ({ ...prev, loading: true, error: '' }));
+    try {
+      const res = await apiClient.put(`/students/${suspendModal.student._id}`, {
+        status: 'Suspended',
+        isManualStatus: true,
+        suspendedFrom: suspendModal.suspendedFrom,
+        suspendedUntil: suspendModal.suspendedUntil,
+        suspensionReason: suspendModal.suspensionReason || ''
+      });
+
+      const updated = res.data;
+      if (selectedStudent && (selectedStudent._id === suspendModal.student._id)) {
+        setSelectedStudent(updated);
+      }
+      setSuspendModal({ isOpen: false, student: null, suspendedFrom: '', suspendedUntil: '', suspensionReason: '', loading: false, error: '' });
+      fetchStudents();
+    } catch (err) {
+      console.error('Error suspending student:', err);
+      setSuspendModal(prev => ({ 
+        ...prev, 
+        loading: false, 
+        error: err.response?.data?.message || 'Failed to suspend student. Please try again.' 
+      }));
+    }
+  };
+
   const handleStatusChange = async (newStatus) => {
     if (!selectedStudent) return;
+    const isCurrentlySuspended = (selectedStudent.status || '').toLowerCase() === 'suspended' || !!selectedStudent.suspendedUntil;
+    if (isCurrentlySuspended && !isAdmin) {
+      alert('This student is suspended and cannot be modified.');
+      return;
+    }
+    if (newStatus === 'Suspended') {
+      openSuspendModal(selectedStudent);
+      return;
+    }
     try {
       const isManual = newStatus === 'On Leave';
-      await apiClient.put(`/students/${selectedStudent._id}`, { 
+      const res = await apiClient.put(`/students/${selectedStudent._id}`, { 
         status: newStatus,
-        isManualStatus: isManual
+        isManualStatus: isManual,
+        suspendedFrom: null,
+        suspendedUntil: null,
+        suspensionReason: ''
       });
-      setSelectedStudent({ ...selectedStudent, status: newStatus, isManualStatus: isManual });
+      setSelectedStudent(res.data);
       fetchStudents();
     } catch (err) {
       console.error('Error updating status:', err);
+      alert(err.response?.data?.message || 'Error updating status');
     }
   };
 
@@ -417,6 +613,7 @@ const Students = () => {
 
   const getStudentStatus = (student) => {
     const raw = (student?.status || 'Available').toString();
+    if (raw.toLowerCase() === 'suspended') return 'Suspended';
     if (raw.toLowerCase() === 'in-active' || raw.toLowerCase() === 'inactive' || raw.toLowerCase() === 'left') return 'In-Active';
     // Respect explicit/manual 'On Leave' status
     if (raw.toLowerCase() === 'on leave' || raw.toLowerCase() === 'onleave') return 'On Leave';
@@ -629,10 +826,19 @@ const Students = () => {
     <div className="p-2 sm:p-6">
       <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{isStudent ? 'My Student Profile' : 'Students'}</h1>
-          <p className="text-sm opacity-70">{isStudent ? 'View and update your personal hostel details' : 'Manage and track student resident records.'}</p>
+          <h1 className="text-2xl font-bold tracking-tight">{isStudent ? (isOwnProfile ? 'My Student Profile' : 'Hostel Leader Profile') : 'Students'}</h1>
+          <p className="text-sm opacity-70">{isStudent ? (isOwnProfile ? 'View and update your personal hostel details' : 'Residency details and records of appointed hostel leader.') : 'Manage and track student resident records.'}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          {isStudent && !isOwnProfile && (
+            <button
+              onClick={handleOpenMyProfile}
+              className="bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+            >
+              <User size={15} />
+              Back to My Profile
+            </button>
+          )}
           {isLeader && (
             <button
               onClick={handleOpenMyProfile}
@@ -664,41 +870,152 @@ const Students = () => {
         <LoadingSpinner label="Loading Student Records..." />
       ) : isStudent ? (
         /* INLINE STUDENT PROFILE VIEW FOR STUDENTS */
-        selectedStudent ? (
-          <div className={`rounded-2xl shadow-xl border overflow-hidden transition ${isDark ? 'bg-[#14161f] text-gray-100 border-gray-800/80' : 'bg-white text-gray-900 border-gray-200'}`}>
-            {/* Header Banner */}
-            <div className="relative bg-gradient-to-r from-indigo-700 via-purple-700 to-indigo-900 text-white p-6 flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center space-x-4">
-                <div className="h-16 w-16 rounded-full bg-white/20 border-2 border-white flex items-center justify-center text-2xl font-bold">
-                  {getStudentName(selectedStudent).charAt(0).toUpperCase()}
+        <div className="space-y-6">
+          {leadersList.length > 0 && (
+            <div className={`p-4 rounded-2xl border ${
+              isDark ? 'bg-[#14161f] border-gray-800' : 'bg-white border-gray-200 shadow-xs'
+            }`}>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck size={18} className="text-amber-500" />
+                  <h3 className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Appointed Hostel Leaders
+                  </h3>
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold">{getStudentName(selectedStudent)}</h2>
-                  <p className="text-indigo-200 text-sm">{getStudentEmail(selectedStudent)}</p>
-                  <div className="flex flex-wrap items-center gap-2 mt-2">
-                    <span className="bg-white/20 text-xs px-2.5 py-0.5 rounded-full font-medium">
-                      Room {selectedStudent.roomNumber || 'N/A'}
-                    </span>
-                    <span className="bg-white/20 text-xs px-2.5 py-0.5 rounded-full font-medium">
-                      Status: {getStudentStatus(selectedStudent)}
-                    </span>
+                <span className="text-[11px] text-gray-500 font-medium">
+                  Click any leader to view their student profile
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {leadersList.map((ldr) => {
+                  const lStudent = ldr.student || (typeof ldr.studentId === 'object' ? ldr.studentId : null);
+                  const lName = ldr.name || ldr.userId?.name || lStudent?.fullName || 'Leader';
+                  const isSelected = selectedStudent && lStudent && selectedStudent._id === lStudent._id;
+                  return (
+                    <div
+                      key={ldr._id}
+                      onClick={() => {
+                        if (lStudent) {
+                          handleViewProfile(lStudent);
+                        } else if (ldr.studentId) {
+                          apiClient.get(`/students/${ldr.studentId}`).then(res => {
+                            if (res.data) handleViewProfile(res.data);
+                          }).catch(console.error);
+                        }
+                      }}
+                      className={`p-3 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition ${
+                        isSelected
+                          ? 'border-amber-500/60 bg-amber-500/10 shadow-xs'
+                          : isDark
+                          ? 'bg-[#1a1c26] border-gray-800 hover:border-indigo-500/50 hover:bg-gray-800/50'
+                          : 'bg-gray-50 border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/40'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-amber-600 to-amber-400 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                          {lName.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>{lName}</p>
+                          <p className="text-[11px] text-amber-500 font-semibold">{ldr.role || 'Hostel Leader'}</p>
+                          {lStudent?.roomNumber && (
+                            <p className={`text-[10px] ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Room {lStudent.roomNumber}</p>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 shrink-0">
+                        View Profile
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {selectedStudent ? (
+            <div className={`rounded-2xl shadow-xl border overflow-hidden transition ${isDark ? 'bg-[#14161f] text-gray-100 border-gray-800/80' : 'bg-white text-gray-900 border-gray-200'}`}>
+              {/* Header Banner */}
+              <div className="relative bg-gradient-to-r from-indigo-700 via-purple-700 to-indigo-900 text-white p-6 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center space-x-4">
+                  <div className="h-16 w-16 rounded-full bg-white/20 border-2 border-white flex items-center justify-center text-2xl font-bold">
+                    {getStudentName(selectedStudent).charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">{getStudentName(selectedStudent)}</h2>
+                    <p className="text-indigo-200 text-sm">{getStudentEmail(selectedStudent)}</p>
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      <span className="bg-white/20 text-xs px-2.5 py-0.5 rounded-full font-medium">
+                        Room {selectedStudent.roomNumber || 'N/A'}
+                      </span>
+                      {(selectedStudent.userId?.role || '').toLowerCase() === 'leader' && (
+                        <span className="bg-amber-400 text-amber-950 font-extrabold text-[10px] sm:text-[11px] px-2.5 py-0.5 rounded-full shadow-xs flex items-center gap-1">
+                          <ShieldCheck size={12} /> Appointed Leader
+                        </span>
+                      )}
+                      <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold inline-flex items-center gap-1 ${
+                        getStudentStatus(selectedStudent) === 'Suspended'
+                          ? 'bg-rose-600 text-white border border-rose-400 shadow-sm'
+                          : getStudentStatus(selectedStudent) === 'On Leave'
+                          ? 'bg-amber-600 text-white'
+                          : 'bg-emerald-600 text-white'
+                      }`}>
+                        {getStudentStatus(selectedStudent) === 'Suspended' && <AlertTriangle size={12} />}
+                        Status: {getStudentStatus(selectedStudent)}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {!isEditing && (
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-sm"
-                >
-                  <Edit3 size={15} />
-                  Edit My Profile
-                </button>
-              )}
-            </div>
+                {!isEditing && isOwnProfile && (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Edit3 size={15} />
+                    Edit My Profile
+                  </button>
+                )}
+              </div>
 
             {/* Profile Body */}
             <div className="p-6 space-y-6">
+              {/* Suspended Alert Banner for Student Profile */}
+              {(getStudentStatus(selectedStudent) === 'Suspended' || selectedStudent.status === 'Suspended' || selectedStudent.suspendedFrom || selectedStudent.suspendedUntil) && (
+                <div className={`p-5 rounded-2xl border flex flex-col sm:flex-row items-start gap-4 transition shadow-md ${
+                  isDark 
+                    ? 'bg-rose-950/50 border-rose-700/60 text-rose-200' 
+                    : 'bg-rose-50 border-rose-300 text-rose-950'
+                }`}>
+                  <div className="p-3 rounded-2xl bg-rose-500/20 text-rose-500 shrink-0 mt-0.5 border border-rose-500/30">
+                    <AlertTriangle size={26} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-rose-600 text-white">
+                        Account Suspended
+                      </span>
+                    </div>
+                    <h3 className={`text-base sm:text-lg font-extrabold mt-1.5 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      Your student residency account is currently suspended
+                    </h3>
+                    <p className={`text-sm font-semibold mt-1 ${isDark ? 'text-rose-300' : 'text-rose-800'}`}>
+                      Suspension Period: <span className="font-extrabold underline text-rose-400 dark:text-rose-200">{formatSuspensionRange(selectedStudent.suspendedFrom, selectedStudent.suspendedUntil)}</span>
+                    </p>
+                    {selectedStudent.suspensionReason && (
+                      <div className={`mt-2.5 p-3 rounded-xl border text-xs italic ${
+                        isDark ? 'bg-rose-950/80 border-rose-800/60 text-rose-200' : 'bg-white border-rose-200 text-rose-900'
+                      }`}>
+                        <span className="font-bold not-italic text-rose-500">Reason / Notes: </span>
+                        "{selectedStudent.suspensionReason}"
+                      </div>
+                    )}
+                    <p className={`text-xs mt-2.5 opacity-85 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                      Notice: During suspension, leave submissions are disabled. Please contact your hostel warden or administration office for assistance.
+                    </p>
+                  </div>
+                </div>
+              )}
               {/* EDIT FORM */}
               {isEditing ? (
                 <form onSubmit={handleSaveProfile} className="space-y-4">
@@ -838,56 +1155,6 @@ const Students = () => {
               ) : (
                 /* READ ONLY PROFILE VIEW */
                 <>
-                  {/* Leave Schedule Card for Student View */}
-                  {(() => {
-                    const sched = getStudentLeaveSchedule(selectedStudent);
-                    if (!sched) return null;
-                    return (
-                      <div className={`mb-4 p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
-                        sched.type === 'active' || sched.type === 'upcoming'
-                          ? isDark ? 'bg-amber-950/40 border-amber-800/60 text-amber-200' : 'bg-amber-50/90 border-amber-200 text-amber-950'
-                          : sched.type === 'pending'
-                          ? isDark ? 'bg-indigo-950/40 border-indigo-800/60 text-indigo-200' : 'bg-indigo-50/90 border-indigo-200 text-indigo-950'
-                          : isDark ? 'bg-gray-900/60 border-gray-800 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-800'
-                      }`}>
-                        <div className="flex items-start gap-3 min-w-0">
-                          <div className={`p-2.5 rounded-xl shrink-0 ${
-                            sched.type === 'active' || sched.type === 'upcoming'
-                              ? 'bg-amber-500/20 text-amber-400'
-                              : 'bg-indigo-500/20 text-indigo-400'
-                          }`}>
-                            <Calendar size={20} />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold uppercase tracking-wider">{sched.title}</span>
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase border ${
-                                sched.type === 'active' || sched.type === 'upcoming'
-                                  ? 'bg-amber-950/80 border-amber-700/60 text-amber-300'
-                                  : 'bg-indigo-950/80 border-indigo-700/60 text-indigo-300'
-                              }`}>
-                                {sched.badge}
-                              </span>
-                            </div>
-                            <div className="text-sm font-bold mt-1">
-                              {sched.departureDateAndTime}
-                            </div>
-                            {sched.returnDateAndTime && (
-                              <div className="text-xs font-medium opacity-90 mt-0.5">
-                                {sched.returnDateAndTime}
-                              </div>
-                            )}
-                            {sched.reason && (
-                              <div className="text-xs mt-1.5 opacity-80 italic">
-                                Reason: "{sched.reason}" {sched.destination ? `• Destination: ${sched.destination}` : ''}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
                   {/* Grid 1: Academic & Course */}
                   <div>
                     <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5 ${isDark ? 'text-gray-400' : 'text-slate-900'}`}>
@@ -936,6 +1203,19 @@ const Students = () => {
                         <p className={`text-sm font-extrabold ${isDark ? 'text-indigo-400' : 'text-indigo-700'}`}>
                           {calculateStudentTotalLeaveDays(selectedStudent)} Days
                         </p>
+                      </div>
+                      <div>
+                        <p className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-slate-700'}`}>Residency Status</p>
+                        <span className={`mt-1 inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border ${
+                          getStudentStatus(selectedStudent) === 'Suspended'
+                            ? 'bg-rose-950/90 text-rose-400 border-rose-800/70'
+                            : getStudentStatus(selectedStudent) === 'On Leave'
+                            ? 'bg-amber-950/90 text-amber-400 border-amber-800/70'
+                            : 'bg-emerald-950/90 text-emerald-400 border-emerald-800/70'
+                        }`}>
+                          {getStudentStatus(selectedStudent) === 'Suspended' && <AlertTriangle size={12} />}
+                          {getStudentStatus(selectedStudent)}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -990,12 +1270,14 @@ const Students = () => {
                       <h3 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                         <Award size={16} className="text-indigo-400" /> Yearly Overall Progress & Accomplishments
                       </h3>
-                      <button
-                        onClick={() => setShowProgressForm(!showProgressForm)}
-                        className="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 rounded-xl text-xs font-semibold transition flex items-center gap-1"
-                      >
-                        <Plus size={14} /> {showProgressForm ? 'Close Form' : 'Add Progress Record'}
-                      </button>
+                      {isOwnProfile && (
+                        <button
+                          onClick={() => setShowProgressForm(!showProgressForm)}
+                          className="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 rounded-xl text-xs font-semibold transition flex items-center gap-1"
+                        >
+                          <Plus size={14} /> {showProgressForm ? 'Close Form' : 'Add Progress Record'}
+                        </button>
+                      )}
                     </div>
 
                     {/* Progress Creation Form */}
@@ -1141,13 +1423,15 @@ const Students = () => {
                                 <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${getCategoryBadgeClass(item.category)}`}>
                                   {item.category}
                                 </span>
-                                <button
-                                  onClick={() => handleDeleteProgress(item._id)}
-                                  className="text-gray-400 hover:text-red-500 p-1 rounded-md transition"
-                                  title="Delete Progress Record"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
+                                {isOwnProfile && (
+                                  <button
+                                    onClick={() => handleDeleteProgress(item._id)}
+                                    className="text-gray-400 hover:text-red-500 p-1 rounded-md transition"
+                                    title="Delete Progress Record"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
                               </div>
 
                               <h4 className={`text-sm font-bold mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>{item.title}</h4>
@@ -1201,9 +1485,10 @@ const Students = () => {
         ) : (
           <div className="p-8 text-center bg-[#14161f] border border-gray-800 rounded-2xl text-gray-400">
             <GraduationCap className="mx-auto mb-2 text-indigo-400" size={24} />
-            <p className="text-sm font-medium">Setting up your student profile...</p>
+            <p className="text-sm font-medium">Select a student or leader to view profile</p>
           </div>
-        )
+        )}
+        </div>
       ) : (
         /* ADMIN / LEADER / TRUST MEMBER DIRECTORY TABLE */
         <div className="space-y-4">
@@ -1262,7 +1547,12 @@ const Students = () => {
                               {sName.charAt(0).toUpperCase()}
                             </div>
                             <div className="ml-3">
-                              <div className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{sName}</div>
+                              <div className={`text-sm font-semibold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                <span>{sName}</span>
+                                {(student.userId?.role || '').toLowerCase() === 'leader' && (
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-500 dark:text-amber-400 border border-amber-500/30">Leader</span>
+                                )}
+                              </div>
                               <div className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{sEmail}</div>
                             </div>
                           </div>
@@ -1285,10 +1575,21 @@ const Students = () => {
                                     ? isDark ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/50' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                                     : sStatus === 'On Leave' || sStatus === 'On leave'
                                     ? isDark ? 'bg-amber-950/80 text-amber-400 border border-amber-800/50' : 'bg-amber-100 text-amber-800 border border-amber-200'
-                                    : isDark ? 'bg-rose-950/80 text-rose-400 border border-rose-800/50' : 'bg-rose-100 text-rose-800 border border-rose-200'
+                                    : sStatus === 'Suspended'
+                                    ? isDark ? 'bg-rose-950 text-rose-400 border border-rose-800/60 font-bold' : 'bg-rose-100 text-rose-800 border border-rose-300 font-bold'
+                                    : isDark ? 'bg-gray-800 text-gray-400 border border-gray-700' : 'bg-gray-100 text-gray-700 border border-gray-300'
                                 }`}>
                                   {sStatus}
                                 </span>
+
+                                {sStatus === 'Suspended' && (student.suspendedFrom || student.suspendedUntil) && (
+                                  <div className="mt-0.5 max-w-[240px]">
+                                    <div className="flex items-center gap-1 text-[11px] font-semibold text-rose-500 dark:text-rose-400" title={`Suspended: ${formatSuspensionRange(student.suspendedFrom, student.suspendedUntil)}`}>
+                                      <Calendar size={11} className="shrink-0 text-rose-500" />
+                                      <span className="truncate">{formatSuspensionRange(student.suspendedFrom, student.suspendedUntil)}</span>
+                                    </div>
+                                  </div>
+                                )}
 
                                 {leaveSched && leaveSched.type === 'upcoming' && (
                                   <div className="mt-0.5 max-w-[210px]">
@@ -1313,6 +1614,36 @@ const Students = () => {
                               <Eye size={14} />
                               View Profile
                             </button>
+                            {isAdmin && (student.status || '').toLowerCase() === 'suspended' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openSuspendModal(student);
+                                }}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition ${
+                                  isDark ? 'bg-rose-900/50 text-rose-300 border-rose-700/60 hover:bg-rose-900/80' : 'bg-rose-100 text-rose-800 border-rose-300 hover:bg-rose-200'
+                                }`}
+                                title="Edit Suspension Dates"
+                              >
+                                <AlertTriangle size={13} />
+                                Edit Suspension
+                              </button>
+                            )}
+                            {(isAdmin || isLeader) && (student.status || '').toLowerCase() !== 'suspended' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openSuspendModal(student);
+                                }}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition ${
+                                  isDark ? 'bg-rose-950/40 text-rose-300 border-rose-800/40 hover:bg-rose-900/50' : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                                }`}
+                                title="Suspend Student"
+                              >
+                                <AlertTriangle size={13} />
+                                Suspend
+                              </button>
+                            )}
                             {isAdmin && (
                               <>
                                 <button
@@ -1422,8 +1753,13 @@ const Students = () => {
       )}
       {/* FULL STUDENT PROFILE MODAL FOR ADMIN / LEADER */}
       {!isStudent && selectedStudent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-xs">
-          <div className={`rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto border animate-in fade-in zoom-in duration-150 ${
+        <div 
+          onClick={handleCloseProfile}
+          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-xs cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className={`rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto border animate-in fade-in zoom-in duration-150 cursor-default ${
             isDark ? 'bg-[#14161f] text-gray-100 border-gray-800' : 'bg-white text-gray-900 border-gray-200'
           }`}>
             
@@ -1434,7 +1770,14 @@ const Students = () => {
                   {getStudentName(selectedStudent).charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0 break-words">
-                  <h2 className="text-lg sm:text-xl font-bold truncate">{getStudentName(selectedStudent)}</h2>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-lg sm:text-xl font-bold truncate">{getStudentName(selectedStudent)}</h2>
+                    {(selectedStudent.userId?.role || '').toLowerCase() === 'leader' && (
+                      <span className="bg-amber-400 text-amber-950 font-extrabold text-[10px] sm:text-[11px] px-2.5 py-0.5 rounded-full shadow-xs flex items-center gap-1">
+                        <ShieldCheck size={12} /> Appointed Leader
+                      </span>
+                    )}
+                  </div>
                   <p className="text-indigo-200 text-xs sm:text-sm truncate">{getStudentEmail(selectedStudent)}</p>
                   <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-1.5">
                     <span className="bg-white/20 text-[11px] sm:text-xs px-2.5 py-0.5 rounded-full font-medium">
@@ -1448,6 +1791,17 @@ const Students = () => {
               </div>
 
               <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                {isAdmin && (selectedStudent.userId?.role || '').toLowerCase() !== 'leader' && (
+                  <button
+                    type="button"
+                    onClick={() => handleAppointAsLeader(selectedStudent)}
+                    className="bg-indigo-500/30 hover:bg-indigo-500/40 text-white border border-indigo-300/40 px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1 shadow-xs"
+                    title="Appoint as Hostel Leader"
+                  >
+                    <UserCheck size={14} />
+                    Appoint Leader
+                  </button>
+                )}
                 {isAdmin && (
                   <button
                     onClick={() => {
@@ -1476,8 +1830,14 @@ const Students = () => {
                   </button>
                 )}
                 <button
-                  onClick={() => setSelectedStudent(null)}
-                  className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-full transition"
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleCloseProfile();
+                  }}
+                  className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-full transition cursor-pointer"
+                  title="Close Profile"
                 >
                   <X size={18} />
                 </button>
@@ -1494,7 +1854,7 @@ const Students = () => {
               )}
 
               {/* Status Selector Bar for Admin & Leader */}
-              {(isAdmin || isLeader) && !isEditing && (
+              {(isAdmin || (isLeader && getStudentStatus(selectedStudent) !== 'Suspended')) && !isEditing && (
                 <div className={`p-3.5 sm:p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
                   isDark ? 'bg-[#1a1c26] border-gray-800' : 'bg-gray-50 border-gray-200'
                 }`}>
@@ -1503,74 +1863,71 @@ const Students = () => {
                     <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Quick Status Action:</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                    {[{ key: 'Active', label: 'Available' }, { key: 'On Leave', label: 'On Leave' }, { key: 'In-Active', label: 'In-Active' }].map((st) => (
+                    {[{ key: 'Active', label: 'Available' }, 
+                      { key: 'On Leave', label: 'On Leave' }, 
+                      { key: 'In-Active', label: 'In-Active' },
+                      { key: 'Suspended', label: 'Suspended' }
+                    ].map((st) => (
                       <button
                         key={st.key}
                         onClick={() => handleStatusChange(st.key)}
                         className={`flex-1 sm:flex-none px-3 py-1.5 text-xs font-semibold rounded-lg transition text-center ${
                           getStudentStatus(selectedStudent) === st.label
-                            ? 'bg-indigo-600 text-white shadow-xs'
+                            ? st.key === 'Suspended'
+                              ? 'bg-rose-600 text-white shadow-xs'
+                              : 'bg-indigo-600 text-white shadow-xs'
                             : isDark
                             ? 'bg-[#222533] border border-gray-700 text-gray-300 hover:bg-gray-800'
                             : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100'
                         }`}
                       >
-                        Set {st.label}
+                        {st.key === 'Suspended' 
+                          ? getStudentStatus(selectedStudent) === 'Suspended' ? 'Suspended (Edit Dates)' : 'Suspend Student'
+                          : `Set ${st.label}`}
                       </button>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Leave Schedule Card in Profile Modal */}
-              {(() => {
-                const sched = getStudentLeaveSchedule(selectedStudent);
-                if (!sched) return null;
-                return (
-                  <div className={`p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
-                    sched.type === 'active' || sched.type === 'upcoming'
-                      ? isDark ? 'bg-amber-950/40 border-amber-800/60 text-amber-200' : 'bg-amber-50/90 border-amber-200 text-amber-950'
-                      : sched.type === 'pending'
-                      ? isDark ? 'bg-indigo-950/40 border-indigo-800/60 text-indigo-200' : 'bg-indigo-50/90 border-indigo-200 text-indigo-950'
-                      : isDark ? 'bg-gray-900/60 border-gray-800 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-800'
-                  }`}>
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div className={`p-2.5 rounded-xl shrink-0 ${
-                        sched.type === 'active' || sched.type === 'upcoming'
-                          ? 'bg-amber-500/20 text-amber-400'
-                          : 'bg-indigo-500/20 text-indigo-400'
-                      }`}>
-                        <Calendar size={20} />
+              {/* Suspended Alert Banner */}
+              {getStudentStatus(selectedStudent) === 'Suspended' && (
+                <div className={`p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+                  isDark ? 'bg-rose-950/40 border-rose-800/60 text-rose-200' : 'bg-rose-50 border-rose-200 text-rose-900'
+                }`}>
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-xl bg-rose-500/20 text-rose-400 shrink-0">
+                      <AlertTriangle size={20} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold uppercase tracking-wider text-rose-400">Student Account Suspended</span>
                       </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold uppercase tracking-wider">{sched.title}</span>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase border ${
-                            sched.type === 'active' || sched.type === 'upcoming'
-                              ? 'bg-amber-950/80 border-amber-700/60 text-amber-300'
-                              : 'bg-indigo-950/80 border-indigo-700/60 text-indigo-300'
-                          }`}>
-                            {sched.badge}
-                          </span>
-                        </div>
-                        <div className="text-sm font-bold mt-1">
-                          {sched.departureDateAndTime}
-                        </div>
-                        {sched.returnDateAndTime && (
-                          <div className="text-xs font-medium opacity-90 mt-0.5">
-                            {sched.returnDateAndTime}
-                          </div>
-                        )}
-                        {sched.reason && (
-                          <div className="text-xs mt-1.5 opacity-80 italic">
-                            Reason: "{sched.reason}" {sched.destination ? `• Destination: ${sched.destination}` : ''}
-                          </div>
-                        )}
-                      </div>
+                      <p className="text-sm font-bold mt-1">
+                        Suspended: <span className="underline">{formatSuspensionRange(selectedStudent.suspendedFrom, selectedStudent.suspendedUntil)}</span>
+                      </p>
+                      {selectedStudent.suspensionReason && (
+                        <p className="text-xs opacity-90 mt-1 italic">
+                          Reason: "{selectedStudent.suspensionReason}"
+                        </p>
+                      )}
                     </div>
                   </div>
-                );
-              })()}
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => openSuspendModal(selectedStudent)}
+                      className={`px-3.5 py-2 text-xs font-bold rounded-xl border transition shrink-0 ${
+                        isDark 
+                          ? 'bg-rose-900/40 hover:bg-rose-900/60 border-rose-700/50 text-rose-200' 
+                          : 'bg-white hover:bg-rose-100 border-rose-300 text-rose-800 shadow-xs'
+                      }`}
+                    >
+                      Change Dates
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* EDIT FORM */}
               {isEditing ? (
@@ -2037,8 +2394,13 @@ const Students = () => {
               isDark ? 'bg-[#1a1c26] border-gray-800' : 'bg-gray-50 border-gray-200'
             }`}>
               <button
-                onClick={() => { setSelectedStudent(null); setIsEditing(false); }}
-                className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition shadow-xs"
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleCloseProfile();
+                }}
+                className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition shadow-xs cursor-pointer"
               >
                 Close Profile
               </button>
@@ -2054,6 +2416,147 @@ const Students = () => {
         onClose={() => setResetModalUser(null)}
         targetUser={resetModalUser}
       />
+
+      {/* Suspend Student Modal */}
+      {suspendModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className={`w-full max-w-md rounded-2xl shadow-2xl border overflow-hidden transition-all ${
+            isDark ? 'bg-[#181a26] border-gray-800 text-white' : 'bg-white border-gray-200 text-gray-900'
+          }`}>
+            {/* Header */}
+            <div className={`px-6 py-4 border-b flex items-center justify-between ${
+              isDark ? 'bg-[#141620] border-gray-800' : 'bg-rose-50/70 border-rose-100'
+            }`}>
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-rose-500/20 text-rose-500">
+                  <AlertTriangle size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-rose-500">Suspend Student</h3>
+                  <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Choose suspension duration for this resident
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSuspendModal({ isOpen: false, student: null, suspendedUntil: '', suspensionReason: '', loading: false, error: '' })}
+                className={`p-1.5 rounded-lg transition ${
+                  isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <form onSubmit={handleConfirmSuspend} className="p-6 space-y-4">
+              {suspendModal.error && (
+                <div className="p-3 text-xs rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 font-medium">
+                  {suspendModal.error}
+                </div>
+              )}
+
+              <div className={`p-3 rounded-xl border ${isDark ? 'bg-[#141620] border-gray-800' : 'bg-gray-50 border-gray-200'}`}>
+                <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Student</p>
+                <p className="text-sm font-bold mt-0.5">{getStudentName(suspendModal.student)}</p>
+                <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} mt-0.5`}>
+                  Room: {suspendModal.student?.roomNumber || 'Unassigned'} • Course: {suspendModal.student?.course || 'N/A'}
+                </p>
+              </div>
+
+              {/* Date Inputs - From Date & Till Date */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Suspended From <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={suspendModal.suspendedFrom}
+                    onChange={(e) => {
+                      const newFrom = e.target.value;
+                      setSuspendModal(prev => ({
+                        ...prev,
+                        suspendedFrom: newFrom,
+                        suspendedUntil: (prev.suspendedUntil && prev.suspendedUntil < newFrom) ? newFrom : prev.suspendedUntil,
+                        error: ''
+                      }));
+                    }}
+                    className={`w-full border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/50 ${
+                      isDark 
+                        ? 'bg-[#141620] border-gray-700 text-white focus:border-rose-500' 
+                        : 'bg-white border-gray-300 text-gray-900 focus:border-rose-500'
+                    }`}
+                  />
+                  <p className={`text-[11px] mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Start date of suspension
+                  </p>
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Suspended Till <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    min={suspendModal.suspendedFrom || new Date().toISOString().split('T')[0]}
+                    value={suspendModal.suspendedUntil}
+                    onChange={(e) => setSuspendModal({ ...suspendModal, suspendedUntil: e.target.value, error: '' })}
+                    className={`w-full border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/50 ${
+                      isDark 
+                        ? 'bg-[#141620] border-gray-700 text-white focus:border-rose-500' 
+                        : 'bg-white border-gray-300 text-gray-900 focus:border-rose-500'
+                    }`}
+                  />
+                  <p className={`text-[11px] mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    End date (inclusive)
+                  </p>
+                </div>
+              </div>
+
+              {/* Reason Input - Optional */}
+              <div>
+                <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Reason / Remarks <span className="text-xs font-normal text-gray-500">(Optional)</span>
+                </label>
+                <textarea
+                  rows="3"
+                  value={suspendModal.suspensionReason}
+                  onChange={(e) => setSuspendModal({ ...suspendModal, suspensionReason: e.target.value })}
+                  placeholder="e.g. Violation of hostel curfew, disciplinary action..."
+                  className={`w-full border rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/50 ${
+                    isDark 
+                      ? 'bg-[#141620] border-gray-700 text-white placeholder-gray-500 focus:border-rose-500' 
+                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:border-rose-500'
+                  }`}
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-200 dark:border-gray-800">
+                <button
+                  type="button"
+                  onClick={() => setSuspendModal({ isOpen: false, student: null, suspendedFrom: '', suspendedUntil: '', suspensionReason: '', loading: false, error: '' })}
+                  className={`px-4 py-2 text-xs font-semibold rounded-xl transition ${
+                    isDark ? 'bg-gray-800 hover:bg-gray-700 text-gray-300' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={suspendModal.loading || !suspendModal.suspendedFrom || !suspendModal.suspendedUntil}
+                  className="px-5 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center gap-1.5"
+                >
+                  {suspendModal.loading ? 'Saving...' : 'Confirm Suspension'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

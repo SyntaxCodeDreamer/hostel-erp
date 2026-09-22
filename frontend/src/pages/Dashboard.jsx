@@ -7,7 +7,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import {
-  Users, Calendar, CheckSquare, Wallet, BookOpen, TrendingUp, Activity, Megaphone, Award, FileText, ExternalLink, Layers, Clock
+  Users, Calendar, CheckSquare, Wallet, BookOpen, TrendingUp, Activity, Megaphone, Award, FileText, ExternalLink, Layers, Clock, AlertTriangle
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -206,6 +206,23 @@ const Dashboard = () => {
         </div>
       </motion.div>
 
+      {/* Student Suspended Banner on Dashboard */}
+      {!isAdminOrLeader && d.studentStatus === 'Suspended' && (
+        <motion.div variants={itemVariants} className={`p-4 rounded-2xl border flex items-start gap-3.5 shadow-sm ${
+          isDark ? 'bg-rose-950/40 border-rose-800/60 text-rose-200' : 'bg-rose-50 border-rose-300 text-rose-950'
+        }`}>
+          <div className="p-2.5 rounded-xl bg-rose-500/20 text-rose-500 shrink-0 mt-0.5">
+            <AlertTriangle size={20} />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold text-rose-500">Account Suspended</h4>
+            <p className="text-xs font-medium mt-0.5 opacity-90">
+              Your student residency account is currently marked as Suspended. Leave applications are disabled during this period. Please visit your Profile page or contact administration for details.
+            </p>
+          </div>
+        </motion.div>
+      )}
+
       {/* Stat Overview Cards */}
       <motion.div variants={itemVariants} className={`grid grid-cols-1 sm:grid-cols-2 ${isAdminOrLeader ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-5`}>
         
@@ -266,11 +283,14 @@ const Dashboard = () => {
                 {isAdminOrLeader ? 'Current total registered' : 'Total approved days'}
               </span>
               {!isAdminOrLeader && d.studentStatus && (
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                  d.studentStatus === 'On Leave'
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1 ${
+                  d.studentStatus === 'Suspended'
+                    ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30 font-bold'
+                    : d.studentStatus === 'On Leave'
                     ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30'
                     : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
                 }`}>
+                  {d.studentStatus === 'Suspended' && <AlertTriangle size={11} />}
                   {d.studentStatus}
                 </span>
               )}

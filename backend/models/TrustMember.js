@@ -9,6 +9,10 @@ const trustMemberSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
   position: {
     type: String,
     required: true

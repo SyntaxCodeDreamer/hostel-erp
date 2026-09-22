@@ -74,6 +74,41 @@ const login = async (req, res) => {
     const user = await findOrSyncUserByEmail(cleanEmail);
 
     if (user && (await user.matchPassword(password.trim()))) {
+      // Check if student account is suspended
+      if ((user.role || '').toLowerCase() === 'student') {
+        const studentProfile = await Student.findOne({ userId: user._id });
+        if (studentProfile) {
+          const now = new Date();
+          const fromDate = studentProfile.suspendedFrom ? new Date(studentProfile.suspendedFrom) : null;
+          const untilDate = studentProfile.suspendedUntil ? new Date(studentProfile.suspendedUntil) : null;
+
+          if (untilDate && now > untilDate) {
+            // Suspension expired! Auto-lift it
+            studentProfile.status = 'Available';
+            studentProfile.isManualStatus = false;
+            studentProfile.suspendedFrom = null;
+            studentProfile.suspendedUntil = null;
+            studentProfile.suspensionReason = '';
+            studentProfile.suspendedAt = null;
+            await studentProfile.save();
+          } else if (fromDate && now < fromDate) {
+            // Future suspension: not active yet, allow login
+          } else if ((studentProfile.status || '').toLowerCase() === 'suspended') {
+            let durationStr = '';
+            if (studentProfile.suspendedFrom && studentProfile.suspendedUntil) {
+              const fromStr = new Date(studentProfile.suspendedFrom).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+              const toStr = new Date(studentProfile.suspendedUntil).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+              durationStr = ` from ${fromStr} till ${toStr}`;
+            } else if (studentProfile.suspendedUntil) {
+              durationStr = ` until ${new Date(studentProfile.suspendedUntil).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+            }
+            return res.status(403).json({ 
+              message: `Your student account has been suspended${durationStr} by administration. Please contact the hostel office.` 
+            });
+          }
+        }
+      }
+
       res.json({
         _id: user._id,
         name: user.name,
@@ -284,7 +319,20 @@ const adminResetPassword = async (req, res) => {
       return res.status(400).json({ message: 'Target user ID is required' });
     }
 
-    const targetUser = await User.findById(targetUserId);
+    const mongoose = require('mongoose');
+    let targetUser = null;
+    if (mongoose.Types.ObjectId.isValid(targetUserId)) {
+      targetUser = await User.findById(targetUserId);
+    }
+    if (!targetUser) {
+      targetUser = await User.findOne({ email: { $regex: new RegExp('^' + targetUserId.toString().trim() + '$', 'i') } });
+    }
+    if (!targetUser && mongoose.Types.ObjectId.isValid(targetUserId)) {
+      const tm = await TrustMember.findById(targetUserId);
+      if (tm && tm.email) {
+        targetUser = await findOrSyncUserByEmail(tm.email);
+      }
+    }
     if (!targetUser) {
       return res.status(404).json({ message: 'Target user account not found' });
     }

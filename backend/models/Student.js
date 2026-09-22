@@ -35,12 +35,28 @@ const studentSchema = new mongoose.Schema({
   roomNumber: { type: String, required: true },
   status: {
     type: String,
-    enum: ['Active', 'Available', 'On Leave', 'In-Active', 'Inactive', 'Left'],
+    enum: ['Active', 'Available', 'On Leave', 'In-Active', 'Inactive', 'Left', 'Suspended'],
     default: 'Available'
   },
   isManualStatus: {
     type: Boolean,
     default: false
+  },
+  suspendedFrom: {
+    type: Date,
+    default: null
+  },
+  suspendedUntil: {
+    type: Date,
+    default: null
+  },
+  suspensionReason: {
+    type: String,
+    default: ''
+  },
+  suspendedAt: {
+    type: Date,
+    default: null
   },
   leaveCount: {
     type: Number,

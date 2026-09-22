@@ -45,6 +45,36 @@ const createLeaveRequest = async (req, res) => {
     if (!student) {
       return res.status(404).json({ message: 'Student profile not found. Cannot submit leave.' });
     }
+    if ((student.status || '').toLowerCase() === 'suspended' || student.suspendedFrom || student.suspendedUntil) {
+      const now = new Date();
+      const fromDate = student.suspendedFrom ? new Date(student.suspendedFrom) : null;
+      const untilDate = student.suspendedUntil ? new Date(student.suspendedUntil) : null;
+
+      if (untilDate && now > untilDate) {
+        // Expired, lift suspension
+        student.status = 'Available';
+        student.isManualStatus = false;
+        student.suspendedFrom = null;
+        student.suspendedUntil = null;
+        student.suspensionReason = '';
+        student.suspendedAt = null;
+        await student.save();
+      } else if (fromDate && now < fromDate) {
+        // Future suspension: not active yet
+      } else if ((student.status || '').toLowerCase() === 'suspended') {
+        let durationStr = '';
+        if (student.suspendedFrom && student.suspendedUntil) {
+          const fromStr = new Date(student.suspendedFrom).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+          const toStr = new Date(student.suspendedUntil).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+          durationStr = ` from ${fromStr} till ${toStr}`;
+        } else if (student.suspendedUntil) {
+          durationStr = ` until ${new Date(student.suspendedUntil).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+        }
+        return res.status(403).json({ 
+          message: `Your student account is suspended${durationStr}. You cannot submit leave requests.` 
+        });
+      }
+    }
 
     const leaveRequest = new LeaveRequest({
       studentId: student._id,
