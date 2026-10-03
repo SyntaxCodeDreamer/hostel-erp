@@ -1,10 +1,10 @@
 require('dotenv').config({ path: 'e:/hostel-erp-main/backend/.env' });
-const connectDB = require('./backend/config/db');
+const connectDB = require('./config/db');
 
 async function run() {
   await connectDB();
-  const Student = require('./backend/models/Student');
-  const Leave = require('./backend/models/LeaveRequest');
+  const Student = require('./models/Student');
+  const Leave = require('./models/LeaveRequest');
   
   const leaves = await Leave.find({ status: { $in: ['Approved', 'approved'] } }).sort({ createdAt: -1 }).lean();
   console.log('Total approved leaves:', leaves.length);
