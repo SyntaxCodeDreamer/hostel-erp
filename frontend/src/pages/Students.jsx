@@ -505,7 +505,7 @@ const Students = () => {
       return;
     }
     try {
-      const isManual = newStatus === 'On Leave';
+      const isManual = true;
       const res = await apiClient.put(`/students/${selectedStudent._id}`, { 
         status: newStatus,
         isManualStatus: isManual,
@@ -599,6 +599,11 @@ const Students = () => {
 
   const isStudentOnActiveLeave = (student) => {
     if (!student) return false;
+    const rawStatus = (student.status || '').toLowerCase();
+    // If student was explicitly set to Available / Active by admin (e.g. early return from leave), they are not on leave
+    if (student.isManualStatus && (rawStatus === 'available' || rawStatus === 'active')) {
+      return false;
+    }
     const studentIdStr = (student._id || student.id || '').toString();
     if (!studentIdStr || !Array.isArray(leavesList) || leavesList.length === 0) {
       return (student.status || '').toLowerCase() === 'on leave';
@@ -626,6 +631,11 @@ const Students = () => {
     // Respect explicit/manual 'On Leave' status
     if (raw.toLowerCase() === 'on leave' || raw.toLowerCase() === 'onleave') return 'On Leave';
     
+    // Respect manual Available / Active override (e.g. early return from leave)
+    if (student?.isManualStatus && (raw.toLowerCase() === 'available' || raw.toLowerCase() === 'active')) {
+      return 'Available';
+    }
+
     // Check real-time active status against leaving time
     if (isStudentOnActiveLeave(student)) {
       return 'On Leave';
@@ -1872,7 +1882,7 @@ const Students = () => {
                     <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Quick Status Action:</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                    {[{ key: 'Active', label: 'Available' }, 
+                    {[{ key: 'Available', label: 'Available' }, 
                       { key: 'On Leave', label: 'On Leave' }, 
                       { key: 'In-Active', label: 'In-Active' },
                       { key: 'Suspended', label: 'Suspended' }

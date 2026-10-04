@@ -102,6 +102,12 @@ const syncBulkStudentLeaveStatus = async (students) => {
       const hasActiveLeaveRequest = onLeaveSet.has(student._id.toString());
 
       if (hasActiveLeaveRequest) {
+        // If an Admin or Leader manually set the student to 'Available' or 'Active' (e.g. early return from leave),
+        // PRESERVE the manual status! Do NOT force them back to 'On Leave'!
+        if (student.isManualStatus && (currentStatus === 'available' || currentStatus === 'active')) {
+          continue;
+        }
+
         // Automatically put student on leave during their approved leave request window
         if (student.status !== 'On Leave') {
           student.status = 'On Leave';
@@ -442,7 +448,9 @@ const updateStudent = async (req, res) => {
       if (req.body.progressItems !== undefined) student.progressItems = req.body.progressItems;
       if (req.body.status && userRole !== 'student') {
         student.status = req.body.status;
-        student.isManualStatus = req.body.status === 'On Leave' || req.body.status === 'Suspended';
+        student.isManualStatus = req.body.isManualStatus !== undefined
+          ? !!req.body.isManualStatus
+          : true;
         if (req.body.status === 'Suspended') {
           if (req.body.suspendedFrom) {
             const from = new Date(req.body.suspendedFrom);
