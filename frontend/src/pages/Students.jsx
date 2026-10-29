@@ -20,6 +20,32 @@ const Students = () => {
   const [leavesList, setLeavesList] = useState([]);
   const [resetModalUser, setResetModalUser] = useState(null);
   const [leadersList, setLeadersList] = useState([]);
+  const [exemptedPeriods, setExemptedPeriods] = useState([]);
+  const [showExemptModal, setShowExemptModal] = useState(false);
+  const [exemptForm, setExemptForm] = useState({ name: '', fromDate: '', toDate: '' });
+  const [exemptSaving, setExemptSaving] = useState(false);
+  const [exemptError, setExemptError] = useState('');
+
+  // Filter leaders who have an actual student resident profile assigned by Admin
+  const leadersWithStudentProfile = useMemo(() => {
+    return (leadersList || []).filter(ldr => {
+      const lStudent = ldr.student || (typeof ldr.studentId === 'object' ? ldr.studentId : null);
+      return Boolean(
+        ldr.hasAssignedStudent ||
+        (ldr.studentId && lStudent && lStudent.roomNumber && lStudent.roomNumber !== 'Unassigned')
+      );
+    });
+  }, [leadersList]);
+
+  // Resolve the assigned leader profile for the currently selected student
+  const studentAssignedLeader = useMemo(() => {
+    if (!selectedStudent?.assignedLeaderId) return null;
+    if (typeof selectedStudent.assignedLeaderId === 'object' && selectedStudent.assignedLeaderId !== null) {
+      return selectedStudent.assignedLeaderId;
+    }
+    return (leadersList || []).find(l => l._id === selectedStudent.assignedLeaderId) || null;
+  }, [selectedStudent?.assignedLeaderId, leadersList]);
+
   const { user } = useContext(AuthContext);
   const { theme } = useContext(ThemeContext);
   const isDark = theme === 'dark';
@@ -127,21 +153,56 @@ const Students = () => {
       return lStudentId === studentIdStr && (l.status === 'Approved' || l.status === 'approved');
     });
 
+    /**
+     * Returns the number of days in [leaveFrom, leaveTo] that fall within
+     * any exempted period and should NOT be counted as leave.
+     */
+    const exemptedDaysForLeave = (leaveFrom, leaveTo) => {
+      if (!exemptedPeriods.length) return 0;
+      let exempted = 0;
+      for (const ep of exemptedPeriods) {
+        const epFrom = new Date(ep.fromDate);
+        const epTo   = new Date(ep.toDate);
+        // overlap: max(leaveFrom, epFrom) to min(leaveTo, epTo)
+        const overlapStart = leaveFrom > epFrom ? leaveFrom : epFrom;
+        const overlapEnd   = leaveTo   < epTo   ? leaveTo   : epTo;
+        if (overlapStart <= overlapEnd) {
+          const days = Math.ceil((overlapEnd - overlapStart) / (1000 * 60 * 60 * 24)) + 1;
+          exempted += days;
+        }
+      }
+      return exempted;
+    };
+
     let sumDays = 0;
     studentLeaves.forEach(l => {
+      let leaveDays = 0;
       if (l.requestedDays !== undefined && l.requestedDays !== null && l.requestedDays !== '') {
-        sumDays += Number(l.requestedDays);
+        leaveDays = Number(l.requestedDays);
       } else if (l.fromDate && l.toDate) {
         const f = new Date(l.fromDate);
         const t = new Date(l.toDate);
         if (!isNaN(f.getTime()) && !isNaN(t.getTime())) {
           const diff = Math.abs(t - f);
-          sumDays += Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1;
+          leaveDays = Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1;
         }
       }
+
+      // Subtract days that fall within exempted periods
+      if (leaveDays > 0 && l.fromDate && l.toDate) {
+        const f = new Date(l.fromDate);
+        const t = new Date(l.toDate);
+        if (!isNaN(f.getTime()) && !isNaN(t.getTime())) {
+          const exempt = exemptedDaysForLeave(f, t);
+          leaveDays = Math.max(0, leaveDays - exempt);
+        }
+      }
+
+      sumDays += leaveDays;
     });
 
     // Check if there were legacy pre-ERP prior leave days entered on the student's earliest leave request
+    // NOTE: previousLeaveDays is never reduced by exempted periods (it's historical data)
     let initialPriorDays = 0;
     if (studentLeaves.length > 0) {
       const sorted = [...studentLeaves].sort((a, b) => new Date(a.createdAt || a.fromDate) - new Date(b.createdAt || b.fromDate));
@@ -167,6 +228,44 @@ const Students = () => {
       alert(err.message || 'Failed to delete student');
     }
   };
+
+  // ── Exempted Periods handlers ────────────────────────────────────────────
+  const handleCreateExemptedPeriod = async () => {
+    if (!exemptForm.name.trim() || !exemptForm.fromDate || !exemptForm.toDate) {
+      setExemptError('Please fill in all fields.');
+      return;
+    }
+    if (new Date(exemptForm.fromDate) > new Date(exemptForm.toDate)) {
+      setExemptError('Start date must be on or before end date.');
+      return;
+    }
+    setExemptSaving(true);
+    setExemptError('');
+    try {
+      const { data } = await apiClient.post('/exempt-periods', {
+        name: exemptForm.name.trim(),
+        fromDate: exemptForm.fromDate,
+        toDate: exemptForm.toDate
+      });
+      setExemptedPeriods(prev => [...prev, data].sort((a, b) => new Date(a.fromDate) - new Date(b.fromDate)));
+      setExemptForm({ name: '', fromDate: '', toDate: '' });
+    } catch (err) {
+      setExemptError(err.response?.data?.message || 'Failed to create exempted period.');
+    } finally {
+      setExemptSaving(false);
+    }
+  };
+
+  const handleDeleteExemptedPeriod = async (id) => {
+    if (!window.confirm('Delete this exempted period?')) return;
+    try {
+      await apiClient.delete(`/exempt-periods/${id}`);
+      setExemptedPeriods(prev => prev.filter(ep => ep._id !== id));
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to delete exempted period.');
+    }
+  };
+  // ─────────────────────────────────────────────────────────────────────────
 
   const getCategoryBadgeClass = (category) => {
     switch (category) {
@@ -271,6 +370,11 @@ const Students = () => {
     apiClient.get('/trust/leaders').then(res => {
       setLeadersList(Array.isArray(res.data) ? res.data : []);
     }).catch(() => {});
+
+    // Fetch exempted periods (holidays / non-count dates)
+    apiClient.get('/exempt-periods').then(res => {
+      setExemptedPeriods(Array.isArray(res.data) ? res.data : []);
+    }).catch(() => {});
   }, [currentPage, searchQuery, location.search]);
 
   const fetchStudents = async (page = currentPage, search = searchQuery) => {
@@ -327,7 +431,8 @@ const Students = () => {
       drivingLicense: !!student.drivingLicense,
       resultDriveLink: student.resultDriveLink || student.resultUrl || '',
       resultUrl: student.resultUrl || '',
-      resultUrls: student.resultUrls || (student.resultUrl ? [student.resultUrl] : [])
+      resultUrls: student.resultUrls || (student.resultUrl ? [student.resultUrl] : []),
+      assignedLeaderId: student.assignedLeaderId?._id || (typeof student.assignedLeaderId === 'string' ? student.assignedLeaderId : '') || ''
     });
 
     try {
@@ -341,6 +446,23 @@ const Students = () => {
       setStudentLeaveCount(approvedCount);
     } catch (err) {
       console.error('Error calculating student leave stats:', err);
+    }
+  };
+
+  const handleQuickAssignLeader = async (studentId, leaderId) => {
+    try {
+      const targetId = studentId || selectedStudent?._id;
+      if (!targetId) return;
+      const { data: updated } = await apiClient.put(`/students/${targetId}`, {
+        assignedLeaderId: leaderId || null
+      });
+      setSelectedStudent(prev => prev ? { ...prev, ...updated } : prev);
+      setSaveSuccess('Leader assignment updated successfully!');
+      fetchStudents();
+      setTimeout(() => setSaveSuccess(''), 3000);
+    } catch (err) {
+      console.error('Error assigning leader:', err);
+      alert(err.response?.data?.message || 'Failed to update leader assignment');
     }
   };
 
@@ -875,6 +997,20 @@ const Students = () => {
               + Add Student
             </Link>
           )}
+          {isAdmin && (
+            <button
+              onClick={() => { setShowExemptModal(true); setExemptError(''); }}
+              className="bg-amber-600/10 hover:bg-amber-600/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+            >
+              <Calendar size={15} />
+              Exempted Periods
+              {exemptedPeriods.length > 0 && (
+                <span className="bg-amber-500 text-white rounded-full px-1.5 py-0.5 text-[10px] ml-0.5">
+                  {exemptedPeriods.length}
+                </span>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
@@ -890,7 +1026,7 @@ const Students = () => {
       ) : isStudent ? (
         /* INLINE STUDENT PROFILE VIEW FOR STUDENTS */
         <div className="space-y-6">
-          {leadersList.length > 0 && (
+          {leadersWithStudentProfile.length > 0 && (
             <div className={`p-4 rounded-2xl border ${
               isDark ? 'bg-[#14161f] border-gray-800' : 'bg-white border-gray-200 shadow-xs'
             }`}>
@@ -906,10 +1042,11 @@ const Students = () => {
                 </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {leadersList.map((ldr) => {
+                {leadersWithStudentProfile.map((ldr) => {
                   const lStudent = ldr.student || (typeof ldr.studentId === 'object' ? ldr.studentId : null);
                   const lName = capitalizeName(ldr.name || ldr.userId?.name || lStudent?.fullName || 'Leader');
                   const isSelected = selectedStudent && lStudent && selectedStudent._id === lStudent._id;
+                  const isMyAssignedLeader = studentAssignedLeader && (studentAssignedLeader._id === ldr._id || studentAssignedLeader.id === ldr._id);
                   return (
                     <div
                       key={ldr._id}
@@ -935,7 +1072,14 @@ const Students = () => {
                           {lName.charAt(0).toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <p className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>{lName}</p>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>{lName}</p>
+                            {isMyAssignedLeader && (
+                              <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                                Your Leader
+                              </span>
+                            )}
+                          </div>
                           <p className="text-[11px] text-amber-500 font-semibold">{ldr.role || 'Hostel Leader'}</p>
                           {lStudent?.roomNumber && (
                             <p className={`text-[10px] ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Room {lStudent.roomNumber}</p>
@@ -999,6 +1143,95 @@ const Students = () => {
 
             {/* Profile Body */}
             <div className="p-6 space-y-6">
+              {/* ASSIGNED HOSTEL LEADER CARD (Chosen by Admin for this student) */}
+              <div className={`p-4 sm:p-5 rounded-2xl border transition shadow-sm ${
+                studentAssignedLeader
+                  ? isDark 
+                    ? 'bg-gradient-to-r from-amber-950/30 via-[#181926] to-[#14161f] border-amber-500/30' 
+                    : 'bg-gradient-to-r from-amber-50/90 via-orange-50/50 to-white border-amber-200'
+                  : isDark 
+                    ? 'bg-[#181a24] border-gray-800' 
+                    : 'bg-gray-50 border-gray-200'
+              }`}>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg shrink-0 shadow-md ${
+                      studentAssignedLeader 
+                        ? 'bg-gradient-to-tr from-amber-600 to-amber-400 text-white' 
+                        : 'bg-gray-700/40 text-gray-400 border border-gray-600/30'
+                    }`}>
+                      <ShieldCheck size={24} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                          studentAssignedLeader 
+                            ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30' 
+                            : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+                        }`}>
+                          Assigned Hostel Leader
+                        </span>
+                        <span className="text-[11px] text-gray-500 font-medium">
+                          (Chosen by Admin)
+                        </span>
+                      </div>
+                      
+                      {studentAssignedLeader ? (
+                        <>
+                          <h3 className={`text-base font-bold mt-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                            {capitalizeName(studentAssignedLeader.name || studentAssignedLeader.userId?.name || 'Hostel Leader')}
+                          </h3>
+                          <div className="flex flex-wrap items-center gap-3 text-xs mt-1 text-gray-500 dark:text-gray-400">
+                            <span className="font-semibold text-amber-500">
+                              {studentAssignedLeader.role || 'Hostel Leader'}
+                            </span>
+                            {studentAssignedLeader.contactNumber && (
+                              <a
+                                href={`tel:${studentAssignedLeader.contactNumber}`}
+                                className="inline-flex items-center gap-1 text-indigo-400 hover:underline font-medium"
+                              >
+                                <Phone size={12} /> {studentAssignedLeader.contactNumber}
+                              </a>
+                            )}
+                            {(studentAssignedLeader.studentId?.roomNumber || studentAssignedLeader.student?.roomNumber) && (
+                              <span className="font-medium">
+                                Room {studentAssignedLeader.studentId?.roomNumber || studentAssignedLeader.student?.roomNumber}
+                              </span>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <p className={`text-xs mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                          No specific hostel leader has been assigned to this student profile yet.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                    {studentAssignedLeader && (studentAssignedLeader.studentId || studentAssignedLeader.student) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const ldrStudent = studentAssignedLeader.student || (typeof studentAssignedLeader.studentId === 'object' ? studentAssignedLeader.studentId : null);
+                          if (ldrStudent) {
+                            handleViewProfile(ldrStudent);
+                          } else if (studentAssignedLeader.studentId) {
+                            apiClient.get(`/students/${studentAssignedLeader.studentId}`).then(res => {
+                              if (res.data) handleViewProfile(res.data);
+                            }).catch(console.error);
+                          }
+                        }}
+                        className="px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-600 dark:text-amber-400 border border-amber-500/30 transition flex items-center gap-1.5 shadow-xs"
+                      >
+                        <User size={14} />
+                        View Leader Profile
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Suspended Alert Banner for Student Profile */}
               {(getStudentStatus(selectedStudent) === 'Suspended' || selectedStudent.status === 'Suspended' || selectedStudent.suspendedFrom || selectedStudent.suspendedUntil) && (
                 <div className={`p-5 rounded-2xl border flex flex-col sm:flex-row items-start gap-4 transition shadow-md ${
@@ -1573,6 +1806,16 @@ const Students = () => {
                                 )}
                               </div>
                               <div className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{sEmail}</div>
+                              {student.assignedLeaderId && (
+                                <div className="flex items-center gap-1 text-[11px] font-semibold text-amber-500 mt-0.5" title="Assigned Hostel Leader">
+                                  <ShieldCheck size={12} className="shrink-0 text-amber-500" />
+                                  <span>Leader: {capitalizeName(
+                                    typeof student.assignedLeaderId === 'object'
+                                      ? student.assignedLeaderId.name || student.assignedLeaderId.userId?.name || 'Leader'
+                                      : (leadersList.find(l => l._id === student.assignedLeaderId)?.name || 'Leader')
+                                  )}</span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -1948,6 +2191,126 @@ const Students = () => {
                 </div>
               )}
 
+              {/* ASSIGNED HOSTEL LEADER CARD (Chosen by Admin for this student) */}
+              <div className={`p-4 sm:p-5 rounded-2xl border transition shadow-sm ${
+                studentAssignedLeader
+                  ? isDark 
+                    ? 'bg-gradient-to-r from-amber-950/30 via-[#181926] to-[#14161f] border-amber-500/30' 
+                    : 'bg-gradient-to-r from-amber-50/90 via-orange-50/50 to-white border-amber-200'
+                  : isDark 
+                    ? 'bg-[#181a24] border-gray-800' 
+                    : 'bg-gray-50 border-gray-200'
+              }`}>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg shrink-0 shadow-md ${
+                      studentAssignedLeader 
+                        ? 'bg-gradient-to-tr from-amber-600 to-amber-400 text-white' 
+                        : 'bg-gray-700/40 text-gray-400 border border-gray-600/30'
+                    }`}>
+                      <ShieldCheck size={24} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                          studentAssignedLeader 
+                            ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30' 
+                            : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+                        }`}>
+                          Assigned Hostel Leader
+                        </span>
+                        <span className="text-[11px] text-gray-500 font-medium">
+                          (Chosen by Admin)
+                        </span>
+                      </div>
+                      
+                      {studentAssignedLeader ? (
+                        <>
+                          <h3 className={`text-base font-bold mt-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                            {capitalizeName(studentAssignedLeader.name || studentAssignedLeader.userId?.name || 'Hostel Leader')}
+                          </h3>
+                          <div className="flex flex-wrap items-center gap-3 text-xs mt-1 text-gray-500 dark:text-gray-400">
+                            <span className="font-semibold text-amber-500">
+                              {studentAssignedLeader.role || 'Hostel Leader'}
+                            </span>
+                            {studentAssignedLeader.contactNumber && (
+                              <a
+                                href={`tel:${studentAssignedLeader.contactNumber}`}
+                                className="inline-flex items-center gap-1 text-indigo-400 hover:underline font-medium"
+                              >
+                                <Phone size={12} /> {studentAssignedLeader.contactNumber}
+                              </a>
+                            )}
+                            {(studentAssignedLeader.studentId?.roomNumber || studentAssignedLeader.student?.roomNumber) && (
+                              <span className="font-medium">
+                                Room {studentAssignedLeader.studentId?.roomNumber || studentAssignedLeader.student?.roomNumber}
+                              </span>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <p className={`text-xs mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                          No specific hostel leader has been assigned to this student profile yet.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                    {studentAssignedLeader && (studentAssignedLeader.studentId || studentAssignedLeader.student) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const ldrStudent = studentAssignedLeader.student || (typeof studentAssignedLeader.studentId === 'object' ? studentAssignedLeader.studentId : null);
+                          if (ldrStudent) {
+                            handleViewProfile(ldrStudent);
+                          } else if (studentAssignedLeader.studentId) {
+                            apiClient.get(`/students/${studentAssignedLeader.studentId}`).then(res => {
+                              if (res.data) handleViewProfile(res.data);
+                            }).catch(console.error);
+                          }
+                        }}
+                        className="px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-600 dark:text-amber-400 border border-amber-500/30 transition flex items-center gap-1.5 shadow-xs"
+                      >
+                        <User size={14} />
+                        View Leader Profile
+                      </button>
+                    )}
+
+                    {isAdmin && (
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          value={studentAssignedLeader?._id || ''}
+                          onChange={(e) => handleQuickAssignLeader(selectedStudent._id, e.target.value)}
+                          className={`text-xs font-semibold px-2.5 py-2 rounded-xl border transition focus:outline-none focus:border-amber-500 ${
+                            isDark 
+                              ? 'bg-[#14161f] border-gray-700 text-gray-300' 
+                              : 'bg-white border-gray-300 text-gray-700'
+                          }`}
+                        >
+                          <option value="">{studentAssignedLeader ? '-- Change Leader --' : '-- Assign Leader --'}</option>
+                          {leadersList.map((ldr) => (
+                            <option key={ldr._id} value={ldr._id}>
+                              {capitalizeName(ldr.name || ldr.userId?.name || 'Leader')} ({ldr.role || 'Leader'})
+                            </option>
+                          ))}
+                        </select>
+                        {studentAssignedLeader && (
+                          <button
+                            type="button"
+                            onClick={() => handleQuickAssignLeader(selectedStudent._id, null)}
+                            className="text-xs text-rose-400 hover:text-rose-300 font-semibold px-2 py-1.5 rounded-lg hover:bg-rose-500/10 transition"
+                            title="Unassign Leader"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* EDIT FORM */}
               {isEditing ? (
                 <form onSubmit={handleSaveProfile} className="space-y-4">
@@ -1958,6 +2321,32 @@ const Students = () => {
                   <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl border ${
                     isDark ? 'bg-[#1a1c26] border-gray-800' : 'bg-gray-50 border-gray-200'
                   }`}>
+                    {/* Assigned Hostel Leader Field for Admin */}
+                    {isAdmin && (
+                      <div className="sm:col-span-2">
+                        <label className={`block text-xs font-bold uppercase mb-1 flex items-center gap-1.5 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
+                          <ShieldCheck size={14} className="text-amber-500" /> Assigned Hostel Leader
+                        </label>
+                        <select
+                          value={editForm.assignedLeaderId || ''}
+                          onChange={(e) => setEditForm({ ...editForm, assignedLeaderId: e.target.value })}
+                          className={`w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:border-indigo-500 ${
+                            isDark ? 'bg-[#14161f] border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'
+                          }`}
+                        >
+                          <option value="">-- No Leader Assigned --</option>
+                          {leadersList.map((ldr) => (
+                            <option key={ldr._id} value={ldr._id}>
+                              {capitalizeName(ldr.name || ldr.userId?.name || 'Leader')} ({ldr.role || 'Hostel Leader'})
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-[11px] text-gray-500 mt-1">
+                          Select the Hostel Leader assigned to this student resident.
+                        </p>
+                      </div>
+                    )}
+
                     <div className="sm:col-span-2">
                       <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Full Name</label>
                       <input
@@ -2586,6 +2975,146 @@ const Students = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Exempted Periods Modal */}
+      {showExemptModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className={`w-full max-w-lg rounded-2xl shadow-2xl border overflow-hidden transition-all ${
+            isDark ? 'bg-[#181a26] border-gray-800 text-white' : 'bg-white border-gray-200 text-gray-900'
+          }`}>
+            {/* Header */}
+            <div className={`px-6 py-4 border-b flex items-center justify-between ${
+              isDark ? 'bg-[#141620] border-gray-800' : 'bg-amber-50/70 border-amber-100'
+            }`}>
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-500">
+                  <Calendar size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-amber-500">Exempted Periods</h3>
+                  <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Leaves in these date ranges will not count toward the student's leave total
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setShowExemptModal(false); setExemptError(''); setExemptForm({ name: '', fromDate: '', toDate: '' }); }}
+                className={`p-1.5 rounded-lg transition ${isDark ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
+              {/* Existing periods list */}
+              {exemptedPeriods.length === 0 ? (
+                <p className={`text-xs text-center py-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                  No exempted periods defined yet.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {exemptedPeriods.map(ep => (
+                    <div
+                      key={ep._id}
+                      className={`flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl border ${
+                        isDark ? 'bg-[#1e2030] border-gray-700' : 'bg-amber-50 border-amber-200'
+                      }`}
+                    >
+                      <div>
+                        <p className="text-xs font-bold">{ep.name}</p>
+                        <p className={`text-[11px] mt-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                          {new Date(ep.fromDate).toLocaleDateString()} — {new Date(ep.toDate).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteExemptedPeriod(ep._id)}
+                        className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-500/10 transition"
+                        title="Delete period"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add new period form */}
+              <div className={`rounded-xl border p-4 space-y-3 ${
+                isDark ? 'bg-[#1a1c2a] border-gray-700' : 'bg-gray-50 border-gray-200'
+              }`}>
+                <p className="text-xs font-bold text-amber-500 uppercase tracking-wide">Add New Period</p>
+
+                {exemptError && (
+                  <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
+                    {exemptError}
+                  </p>
+                )}
+
+                <div>
+                  <label className={`block text-xs font-semibold mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Period Name <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={exemptForm.name}
+                    onChange={e => setExemptForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="e.g. Diwali Vacation, Exam Week"
+                    className={`w-full px-3 py-2 rounded-xl border text-xs outline-none transition ${
+                      isDark
+                        ? 'bg-[#141620] border-gray-700 text-white placeholder-gray-600 focus:border-amber-500/60'
+                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:border-amber-400'
+                    }`}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-xs font-semibold mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                      From Date <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={exemptForm.fromDate}
+                      onChange={e => setExemptForm(f => ({ ...f, fromDate: e.target.value }))}
+                      className={`w-full px-3 py-2 rounded-xl border text-xs outline-none transition ${
+                        isDark
+                          ? 'bg-[#141620] border-gray-700 text-white focus:border-amber-500/60'
+                          : 'bg-white border-gray-300 text-gray-900 focus:border-amber-400'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-xs font-semibold mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                      To Date <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={exemptForm.toDate}
+                      min={exemptForm.fromDate || undefined}
+                      onChange={e => setExemptForm(f => ({ ...f, toDate: e.target.value }))}
+                      className={`w-full px-3 py-2 rounded-xl border text-xs outline-none transition ${
+                        isDark
+                          ? 'bg-[#141620] border-gray-700 text-white focus:border-amber-500/60'
+                          : 'bg-white border-gray-300 text-gray-900 focus:border-amber-400'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleCreateExemptedPeriod}
+                  disabled={exemptSaving}
+                  className="w-full py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5"
+                >
+                  <Plus size={13} />
+                  {exemptSaving ? 'Saving...' : 'Add Exempted Period'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

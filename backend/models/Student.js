@@ -62,6 +62,11 @@ const studentSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  assignedLeaderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'LeaderProfile',
+    default: null
+  },
   resultUrl: {
     type: String
   },

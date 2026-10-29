@@ -63,11 +63,14 @@ const trustRoutes = require('./routes/trustRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const pushRoutes = require('./routes/pushRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const permissionRoutes = require('./routes/permissionRoutes');
+const exemptedPeriodRoutes = require('./routes/exemptedPeriodRoutes');
 
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/leaves', leaveRoutes);
+app.use('/api/permissions', permissionRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/tasks', taskRoutes);
 // app.use('/api/expenses', expenseRoutes);
@@ -75,6 +78,7 @@ app.use('/api/trust', trustRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/exempt-periods', exemptedPeriodRoutes);
 
 // Serve Frontend Static Production Build
 const frontendDistPath = path.join(__dirname, '../frontend/dist');

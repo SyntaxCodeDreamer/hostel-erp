@@ -156,6 +156,7 @@ const DashboardLayout = () => {
     if (path.startsWith('/leaves/edit')) return 'Edit Leave Request';
     if (path === '/leaves/request') return 'Request Leave';
     if (path.startsWith('/leaves')) return 'Leaves';
+    if (path.startsWith('/permissions') || path.startsWith('/permission')) return 'Permissions';
     if (path === '/students/add') return 'Add Student';
     if (path.startsWith('/students')) return 'Students';
     if (path.startsWith('/tasks')) return 'Tasks';
@@ -218,23 +219,27 @@ const DashboardLayout = () => {
               { path: '/', label: 'Dashboard' },
               { path: '/students', label: 'Students' },
               { path: '/leaves', label: 'Leaves' },
+              { path: '/permissions', label: 'Permission' },
               { path: '/tasks', label: 'Tasks' },
               { path: '/announcements', label: 'Announcements' },
-            ].map((item) => (
-              <Link 
-                key={item.path}
-                to={item.path} 
-                className={`block py-2.5 px-4 rounded-xl font-medium transition ${
-                  location.pathname === item.path 
-                    ? 'bg-indigo-600 text-white shadow-sm font-semibold' 
-                    : isDark 
-                    ? 'text-gray-400 hover:bg-[#1a1c29] hover:text-white' 
-                    : 'text-slate-800 font-semibold hover:bg-slate-100 hover:text-slate-950'
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
+            ].map((item) => {
+              const isActive = location.pathname === item.path || (item.path === '/permissions' && location.pathname.startsWith('/permission'));
+              return (
+                <Link 
+                  key={item.path}
+                  to={item.path} 
+                  className={`block py-2.5 px-4 rounded-xl font-medium transition ${
+                    isActive 
+                      ? 'bg-indigo-600 text-white shadow-sm font-semibold' 
+                      : isDark 
+                      ? 'text-gray-400 hover:bg-[#1a1c29] hover:text-white' 
+                      : 'text-slate-800 font-semibold hover:bg-slate-100 hover:text-slate-950'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
 
             {/* 
             {['admin', 'leader', 'trustee', 'trust member'].includes((user?.role || '').toLowerCase()) && (

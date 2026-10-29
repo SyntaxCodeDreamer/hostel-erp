@@ -8,6 +8,18 @@ const { sendPushNotification } = require('../utils/webPush');
 const { isLeaveCurrentlyActive } = require('../utils/dateHelper');
 const { capitalizeName } = require('../utils/formatters');
 
+const populateStudentOptions = [
+  { path: 'userId', select: 'name email role profileImage' },
+  {
+    path: 'assignedLeaderId',
+    select: 'name email role contactNumber duration studentId userId',
+    populate: [
+      { path: 'userId', select: 'name email role profileImage' },
+      { path: 'studentId', select: 'fullName roomNumber mobile course' }
+    ]
+  }
+];
+
 // Helper to auto-sync student status ('On Leave' vs 'Available') for a list of students in 1 SINGLE DB QUERY
 const syncBulkStudentLeaveStatus = async (students) => {
   if (!Array.isArray(students) || students.length === 0) return students;
@@ -159,7 +171,7 @@ const getStudents = async (req, res) => {
 
     if (userRole === 'student') {
       // Students only see their own profile
-      let student = await Student.findOne({ userId: req.user._id }).populate('userId', 'name email role profileImage').lean();
+      let student = await Student.findOne({ userId: req.user._id }).populate(populateStudentOptions).lean();
       if (!student) {
         const newStudent = new Student({
           userId: req.user._id,
@@ -177,7 +189,7 @@ const getStudents = async (req, res) => {
           status: 'Available'
         });
         await newStudent.save();
-        student = await Student.findById(newStudent._id).populate('userId', 'name email profileImage').lean();
+        student = await Student.findById(newStudent._id).populate(populateStudentOptions).lean();
       }
       if (student) {
         await syncBulkStudentLeaveStatus([student]);
@@ -205,7 +217,7 @@ const getStudents = async (req, res) => {
 
       const total = await Student.countDocuments(query);
       const students = await Student.find(query)
-        .populate('userId', 'name email role profileImage')
+        .populate(populateStudentOptions)
         .skip(skip)
         .limit(limit)
         .lean();
@@ -219,7 +231,7 @@ const getStudents = async (req, res) => {
       });
     }
 
-    const students = await Student.find(query).populate('userId', 'name email role profileImage').lean();
+    const students = await Student.find(query).populate(populateStudentOptions).lean();
     await syncBulkStudentLeaveStatus(students);
     res.json(students);
   } catch (error) {
@@ -232,7 +244,7 @@ const getStudents = async (req, res) => {
 // @access  Private (Student)
 const getMyStudentProfile = async (req, res) => {
   try {
-    let student = await Student.findOne({ userId: req.user._id }).populate('userId', 'name email role profileImage').lean();
+    let student = await Student.findOne({ userId: req.user._id }).populate(populateStudentOptions).lean();
     if (!student) {
       const userRole = (req.user.role || '').toLowerCase();
       if (userRole === 'student' || userRole === 'leader') {
@@ -252,7 +264,7 @@ const getMyStudentProfile = async (req, res) => {
           status: 'Available'
         });
         await newStudent.save();
-        student = await Student.findById(newStudent._id).populate('userId', 'name email role profileImage').lean();
+        student = await Student.findById(newStudent._id).populate(populateStudentOptions).lean();
       } else {
         return res.status(404).json({ message: 'Student profile not found' });
       }
@@ -269,7 +281,7 @@ const getMyStudentProfile = async (req, res) => {
 // @access  Private
 const getStudentById = async (req, res) => {
   try {
-    let student = await Student.findById(req.params.id).populate('userId', 'name email role profileImage').lean();
+    let student = await Student.findById(req.params.id).populate(populateStudentOptions).lean();
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
     }
@@ -326,7 +338,8 @@ const createStudent = async (req, res) => {
       fullName: cleanName,
       village, homeAddress, course, collegeName,
       otherCourseOrJob, joiningYear, joiningMonth,
-      mobile, parentsMobile, drivingLicense, drivingLicenseProofUrl, roomNumber
+      mobile, parentsMobile, drivingLicense, drivingLicenseProofUrl, roomNumber,
+      assignedLeaderId: (req.body.assignedLeaderId && req.body.assignedLeaderId !== 'none') ? req.body.assignedLeaderId : null
     });
 
     const createdStudent = await student.save();
@@ -382,7 +395,8 @@ const updateMyStudentProfile = async (req, res) => {
     }
     if (req.body.resultUrls !== undefined) student.resultUrls = req.body.resultUrls;
 
-    const updatedStudent = await student.save();
+    await student.save();
+    const updatedStudent = await Student.findById(student._id).populate(populateStudentOptions).lean();
     res.json(updatedStudent);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -502,7 +516,16 @@ const updateStudent = async (req, res) => {
         student.isManualStatus = !!req.body.isManualStatus;
       }
 
-      const updatedStudent = await student.save();
+      if (req.body.assignedLeaderId !== undefined && (userRole === 'admin' || userRole === 'leader')) {
+        if (!req.body.assignedLeaderId || req.body.assignedLeaderId === 'none' || req.body.assignedLeaderId === 'null') {
+          student.assignedLeaderId = null;
+        } else {
+          student.assignedLeaderId = req.body.assignedLeaderId;
+        }
+      }
+
+      await student.save();
+      const updatedStudent = await Student.findById(student._id).populate(populateStudentOptions).lean();
       res.json(updatedStudent);
     } else {
       res.status(404).json({ message: 'Student not found' });

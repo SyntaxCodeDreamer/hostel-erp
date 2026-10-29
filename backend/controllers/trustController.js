@@ -152,12 +152,21 @@ const getLeaders = async (req, res) => {
         const uId = l.userId._id || l.userId;
         student = await Student.findOne({ userId: uId }).lean();
       }
+
+      const hasAssigned = Boolean(
+        l.studentId &&
+        student &&
+        student.roomNumber &&
+        student.roomNumber !== 'Unassigned'
+      );
+
       return {
         ...l,
         name: capitalizeName(l.name || l.userId?.name || student?.fullName || ''),
         email: l.email || l.userId?.email || student?.email || '',
         contactNumber: l.contactNumber || student?.mobile || '',
-        student: student || null
+        student: student || null,
+        hasAssignedStudent: hasAssigned
       };
     }));
 
@@ -311,7 +320,9 @@ const updateLeader = async (req, res) => {
     if (duration !== undefined) leader.duration = duration;
 
     // Handle assigning or changing student profile
-    if (studentId) {
+    if (studentId === null || studentId === '' || studentId === 'none') {
+      leader.studentId = null;
+    } else if (studentId) {
       const targetStudent = await Student.findById(studentId);
       if (targetStudent) {
         // If leader had an auto-created dummy student, delete it to avoid ghost records
@@ -377,7 +388,22 @@ const updateLeader = async (req, res) => {
       .populate('studentId')
       .lean();
 
-    res.json(updatedLeader);
+    const s = updatedLeader.studentId;
+    const hasAssigned = Boolean(
+      updatedLeader.studentId &&
+      s &&
+      s.roomNumber &&
+      s.roomNumber !== 'Unassigned'
+    );
+
+    res.json({
+      ...updatedLeader,
+      name: capitalizeName(updatedLeader.name || updatedLeader.userId?.name || s?.fullName || ''),
+      email: updatedLeader.email || updatedLeader.userId?.email || s?.email || '',
+      contactNumber: updatedLeader.contactNumber || s?.mobile || '',
+      student: s || null,
+      hasAssignedStudent: hasAssigned
+    });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

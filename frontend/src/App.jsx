@@ -17,6 +17,7 @@ const Leaves = lazy(() => import('./pages/Leaves'));
 const LeaveRequestForm = lazy(() => import('./pages/LeaveRequestForm'));
 const Tasks = lazy(() => import('./pages/Tasks'));
 const Announcements = lazy(() => import('./pages/Announcements'));
+const Permissions = lazy(() => import('./pages/Permissions'));
 // const Expenses = lazy(() => import('./pages/Expenses'));
 const TrustLeader = lazy(() => import('./pages/TrustLeader'));
 
@@ -61,6 +62,8 @@ function App() {
                     } />
                     <Route path="tasks" element={<Tasks />} />
                     <Route path="announcements" element={<Announcements />} />
+                    <Route path="permissions" element={<Permissions />} />
+                    <Route path="permission" element={<Permissions />} />
                     {/* 
                     <Route path="expenses" element={
                       <ProtectedRoute allowedRoles={['Admin', 'Leader', 'Trustee', 'Trust Member']}>
